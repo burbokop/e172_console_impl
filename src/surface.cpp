@@ -13,8 +13,9 @@ void surface::set_auto_resize(bool newAuto_resize) {
     m_auto_resize = newAuto_resize;
 }
 
-surface::surface(bool auto_resize, uint32_t mask, bool ignore_alpha, double symbol_wh_fraction)
-    : m_auto_resize(auto_resize),
+surface::surface(colorizer *colorizer, bool auto_resize, uint32_t mask, bool ignore_alpha, double symbol_wh_fraction)
+    : m_colorizer(colorizer),
+      m_auto_resize(auto_resize),
       m_mask(mask),
       m_ignore_alpha(ignore_alpha),
       m_symbol_wh_fraction(symbol_wh_fraction) {}
@@ -57,7 +58,7 @@ void surface::update() {
         const auto h = m_bitmap.height;
 
         std::string buffer; { buffer.reserve(); }
-        const char* lastColorCode = nullptr;
+        std::string lastColorCode;
         for(std::size_t y = 0; y < h; ++y) {
             for(std::size_t x = 0; x < w; ++x) {
 
@@ -67,16 +68,19 @@ void surface::update() {
                 //std::uint32_t argb = m_bitmap[y * m_bitmap.width + x];
                 if(m_ignore_alpha) { argb |= 0xff000000; }
                 argb &= m_mask;
-                const auto& cc = color::argbToColorCode(argb);
-                if(cc != lastColorCode) {
-                    if(cc) {
-                        buffer += cc;
-                    } else {
-                        buffer += color::reset;
+
+                if(m_colorizer) {
+                    std::string cc = m_colorizer->beginSeq(argb);
+                    if(cc != lastColorCode) {
+                        if(cc.size() > 0) {
+                            buffer += cc;
+                        } else {
+                            buffer += m_colorizer->endSeq();
+                        }
+                        lastColorCode = cc;
                     }
-                    lastColorCode = cc;
                 }
-                buffer += color::argbToChar(argb);
+                buffer += character::argbToChar(argb);
             }
             buffer += '\n';
         }

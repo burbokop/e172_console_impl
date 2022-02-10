@@ -3,15 +3,18 @@
 
 #include <vector>
 #include "pixelprimitives.h"
+#include "color.h"
 
 class surface {
     pixel_primitives::bitmap m_bitmap;
+    colorizer *m_colorizer;
     bool m_auto_resize;
     std::uint32_t m_mask;
     bool m_ignore_alpha;
     double m_symbol_wh_fraction;
 public:
     surface(
+            colorizer *colorizer = nullptr,
             bool auto_resize = true,
             std::uint32_t mask = 0xffffffff,
             bool ignore_alpha = false,

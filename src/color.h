@@ -2,9 +2,17 @@
 #define COLOR_H
 
 #include <cstdint>
+#include <string>
 
-struct color {
-    static constexpr const char gradient[] = " .:!/r(l1Z4H9W8$@";
+class colorizer {
+public:
+    virtual std::string beginSeq(std::uint32_t argb) const = 0;
+    virtual std::string endSeq() const = 0;
+    virtual ~colorizer() {}
+};
+
+class ansi_colorizer : public colorizer {
+public:
 
     struct color_mapping {
         const char* code;
@@ -53,8 +61,25 @@ struct color {
     static constexpr std::size_t mappingSize = sizeof (mapping) / sizeof (mapping[0]);
     static inline const char* reset = "\033[0m";
 
-    static const char* argbToColorCode(std::uint32_t argb);
+    // colorizer interface
+public:
+    virtual std::string beginSeq(std::uint32_t argb) const override;
+    virtual std::string endSeq() const override;
+};
 
+class ansi_true_colorizer : public colorizer {
+public:
+    static inline const char* reset = "\033[0m";
+
+    // colorizer interface
+public:
+    virtual std::string beginSeq(std::uint32_t argb) const override;
+    virtual std::string endSeq() const override;
+};
+
+
+struct character {
+    static constexpr const char gradient[] = " .:!/r(l1Z4H9W8$@";
     static char argbToChar(std::uint32_t argb);
     static char brightnessToChar(std::uint8_t brightness);
 };

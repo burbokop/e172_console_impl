@@ -18,12 +18,15 @@ inline pixel_primitives::bitmap sdl_surface_to_bitmap(SDL_Surface* surf) {
 }
 
 int main() {
-    std::vector<pixel_primitives::bitmap> vvv;
-
-    mp4_decoder::decode(vvv, "/home/borys/Videos/a.mp4", std::cout, 1000, 0.25);
+    //std::vector<pixel_primitives::bitmap> vvv;
 
 
+    //return 0;
 
+    mp4_decoder decoder("/home/borys/Videos/video_2022-02-10_12-08-58.mp4", std::cout, 1 / 8.);
+
+    std::cout << "frame count: " << decoder.frame_count() << std::endl;
+    //return 0;
 
     std::ifstream istr("/home/borys/Pictures/sculpture_64.png");
     if(!istr.is_open()) {
@@ -42,7 +45,10 @@ int main() {
 
     painter p;
 
-    surface s(true, 0xffffffff, false);
+    ansi_colorizer ansi_colorizer;
+    ansi_true_colorizer ansi_true_colorizer;
+
+    surface s(&ansi_true_colorizer, true, 0xffffffff, false);
 
     std::size_t last_w = 0;
     std::size_t last_h = 0;
@@ -64,7 +70,7 @@ int main() {
 
             //pixel_primitives::draw_circle(s.bitmap(), s.bitmap().width / 2, s.bitmap().height / 2, 12, 0xff00ff00);
 
-            pixel_primitives::blit(s.bitmap(), vvv[frame_index], 0, 0);
+            pixel_primitives::blit(s.bitmap(), decoder.frame(frame_index), 0, 0);
 
 
             if(true && (s.bitmap().width != last_w || s.bitmap().height != last_h)) {
@@ -83,7 +89,7 @@ int main() {
 
             //if(frameChangeTimer.check()) {
             ++frame_index;
-            frame_index %= vvv.size();
+            frame_index %= decoder.frame_count();
             //}
 
             SDL_UnlockSurface(sdl_surface);

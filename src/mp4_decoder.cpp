@@ -1,18 +1,15 @@
 #include "mp4_decoder.h"
 
-mp4_decoder::mp4_decoder()
-{
-
-}
-
-std::uint8_t mp4_decoder::canal(AVFrame *frame, std::size_t canal_no, std::size_t x, std::size_t y, std::size_t width) {
-    return frame->data[canal_no][y * frame->linesize[canal_no] * frame->linesize[canal_no] / width + x * frame->linesize[canal_no] / width];
-}
-
-int mp4_decoder::decode(std::vector<pixel_primitives::bitmap>& dst_btmps, const char *path, std::ostream &log, std::size_t packet_count_to_process, double scale) {
+mp4_decoder::mp4_decoder(const char *path,
+        std::ostream &log,
+        double scale
+        )
+    : m_path(path),
+      m_log(log),
+      m_scale(scale) {
     if (!path) {
         log << "You need to specify a media file." << std::endl;
-        return -1;
+        return;
     }
 
     log << "initializing all the containers, codecs and protocols." << std::endl;
@@ -20,10 +17,9 @@ int mp4_decoder::decode(std::vector<pixel_primitives::bitmap>& dst_btmps, const 
     // AVFormatContext holds the header information from the format (Container)
     // Allocating memory for this component
     // http://ffmpeg.org/doxygen/trunk/structAVFormatContext.html
-    AVFormatContext *pFormatContext = avformat_alloc_context();
-    if (!pFormatContext) {
+    if (!(m_formatContext = avformat_alloc_context())) {
         log << "ERROR could not allocate memory for Format Context" << std::endl;
-        return -1;
+        return;
     }
 
     log << "opening the input file " << path << " and loading format (container) header" << std::endl;
@@ -34,15 +30,15 @@ int mp4_decoder::decode(std::vector<pixel_primitives::bitmap>& dst_btmps, const 
     // AVInputFormat (if you pass NULL it'll do the auto detect)
     // and AVDictionary (which are options to the demuxer)
     // http://ffmpeg.org/doxygen/trunk/group__lavf__decoding.html#ga31d601155e9035d5b0e7efedc894ee49
-    if (avformat_open_input(&pFormatContext, path, NULL, NULL) != 0) {
+    if (avformat_open_input(&m_formatContext, path, NULL, NULL) != 0) {
         log << "ERROR could not open the file" << std::endl;
-        return -1;
+        return;
     }
 
     // now we have access to some information about our file
     // since we read its header we can say what format (container) it's
     // and some other information related to the format itself.
-    log << "format " << pFormatContext->iformat->name << ", duration " << pFormatContext->duration << " us, bit_rate " << pFormatContext->bit_rate << std::endl;
+    log << "format " << m_formatContext->iformat->name << ", duration " << m_formatContext->duration << " us, bit_rate " << m_formatContext->bit_rate << std::endl;
 
     log << "finding stream info from format" << std::endl;
     // read Packets from the Format to get stream information
@@ -53,9 +49,9 @@ int mp4_decoder::decode(std::vector<pixel_primitives::bitmap>& dst_btmps, const 
     // and options contains options for codec corresponding to i-th stream.
     // On return each dictionary will be filled with options that were not found.
     // https://ffmpeg.org/doxygen/trunk/group__lavf__decoding.html#gad42172e27cddafb81096939783b157bb
-    if (avformat_find_stream_info(pFormatContext,  NULL) < 0) {
+    if (avformat_find_stream_info(m_formatContext,  NULL) < 0) {
         log << "ERROR could not get the stream info" << std::endl;
-        return -1;
+        return;
     }
 
     // the component that knows how to enCOde and DECode the stream
@@ -65,17 +61,16 @@ int mp4_decoder::decode(std::vector<pixel_primitives::bitmap>& dst_btmps, const 
     // this component describes the properties of a codec used by the stream i
     // https://ffmpeg.org/doxygen/trunk/structAVCodecParameters.html
     AVCodecParameters *pCodecParameters =  NULL;
-    int video_stream_index = -1;
+    m_video_stream_index = -1;
 
     // loop though all the streams and print its main information
-    for (int i = 0; i < pFormatContext->nb_streams; i++)
-    {
+    for (int i = 0; i < m_formatContext->nb_streams; i++) {
         AVCodecParameters *pLocalCodecParameters =  NULL;
-        pLocalCodecParameters = pFormatContext->streams[i]->codecpar;
-        log << "AVStream->time_base before open coded " << pFormatContext->streams[i]->time_base.num << "/" << pFormatContext->streams[i]->time_base.den << std::endl;
-        log << "AVStream->r_frame_rate before open coded " << pFormatContext->streams[i]->r_frame_rate.num << "/" << pFormatContext->streams[i]->r_frame_rate.den << std::endl;
-        log << "AVStream->start_time " << pFormatContext->streams[i]->start_time << std::endl;
-        log << "AVStream->duration " << pFormatContext->streams[i]->duration << std::endl;
+        pLocalCodecParameters = m_formatContext->streams[i]->codecpar;
+        log << "AVStream->time_base before open coded " << m_formatContext->streams[i]->time_base.num << "/" << m_formatContext->streams[i]->time_base.den << std::endl;
+        log << "AVStream->r_frame_rate before open coded " << m_formatContext->streams[i]->r_frame_rate.num << "/" << m_formatContext->streams[i]->r_frame_rate.den << std::endl;
+        log << "AVStream->start_time " << m_formatContext->streams[i]->start_time << std::endl;
+        log << "AVStream->duration " << m_formatContext->streams[i]->duration << std::endl;
 
         log << "finding the proper decoder (CODEC)" << std::endl;
 
@@ -93,8 +88,8 @@ int mp4_decoder::decode(std::vector<pixel_primitives::bitmap>& dst_btmps, const 
 
         // when the stream is a video we store its index, codec parameters and codec
         if (pLocalCodecParameters->codec_type == AVMEDIA_TYPE_VIDEO) {
-            if (video_stream_index == -1) {
-                video_stream_index = i;
+            if (m_video_stream_index == -1) {
+                m_video_stream_index = i;
                 pCodec = pLocalCodec;
                 pCodecParameters = pLocalCodecParameters;
             }
@@ -108,79 +103,90 @@ int mp4_decoder::decode(std::vector<pixel_primitives::bitmap>& dst_btmps, const 
         log << "\tCodec " << pLocalCodec->name << " ID " << pLocalCodec->id << " bit_rate " << pLocalCodecParameters->bit_rate << std::endl;
     }
 
-    if (video_stream_index == -1) {
+    if (m_video_stream_index == -1) {
         log << "File " << path << " does not contain a video stream!" << std::endl;
-        return -1;
+        return;
     }
 
     // https://ffmpeg.org/doxygen/trunk/structAVCodecContext.html
-    AVCodecContext *pCodecContext = avcodec_alloc_context3(pCodec);
-    if (!pCodecContext) {
+    if (!(m_codecContext = avcodec_alloc_context3(pCodec))) {
         log << "failed to allocated memory for AVCodecContext" << std::endl;
-        return -1;
+        return;
     }
 
     // Fill the codec context based on the values from the supplied codec parameters
     // https://ffmpeg.org/doxygen/trunk/group__lavc__core.html#gac7b282f51540ca7a99416a3ba6ee0d16
-    if (avcodec_parameters_to_context(pCodecContext, pCodecParameters) < 0)
+    if (avcodec_parameters_to_context(m_codecContext, pCodecParameters) < 0)
     {
         log << "failed to copy codec params to codec context" << std::endl;
-        return -1;
+        return;
     }
 
     // Initialize the AVCodecContext to use the given AVCodec.
     // https://ffmpeg.org/doxygen/trunk/group__lavc__core.html#ga11f785a188d7d9df71621001465b0f1d
-    if (avcodec_open2(pCodecContext, pCodec, NULL) < 0)
+    if (avcodec_open2(m_codecContext, pCodec, NULL) < 0)
     {
         log << "failed to open codec through avcodec_open2" << std::endl;
-        return -1;
+        return;
     }
 
     // https://ffmpeg.org/doxygen/trunk/structAVFrame.html
-    AVFrame *pFrame = av_frame_alloc();
-    if (!pFrame)
-    {
+    if (!(m_frame = av_frame_alloc())) {
         log << "failed to allocated memory for AVFrame" << std::endl;
-        return -1;
+        return;
     }
     // https://ffmpeg.org/doxygen/trunk/structAVPacket.html
-    AVPacket *pPacket = av_packet_alloc();
-    if (!pPacket)
-    {
+    if (!(m_packet = av_packet_alloc())) {
         log << "failed to allocated memory for AVPacket" << std::endl;
-        return -1;
+        return;
+    }
+
+
+
+}
+
+pixel_primitives::bitmap &mp4_decoder::frame(std::size_t index) const {
+    if(index < m_cache.size()) {
+        return m_cache[index];
     }
 
     int response = 0;
 
     // fill the Packet with data from the Stream
     // https://ffmpeg.org/doxygen/trunk/group__lavf__decoding.html#ga4fdb3084415a82e3810de6ee60e46a61
-    while (av_read_frame(pFormatContext, pPacket) >= 0)
-    {
+    while (av_read_frame(m_formatContext, m_packet) >= 0) {
         // if it's the video stream
-        if (pPacket->stream_index == video_stream_index) {
-            log << "AVPacket->pts " << pPacket->pts << std::endl;
-            response = decode_packet(dst_btmps, pPacket, pCodecContext, pFrame, log, scale);
+        if (m_packet->stream_index == m_video_stream_index) {
+            m_log << "AVPacket->pts " << m_packet->pts << std::endl;
+            response = decode_packet(m_cache, m_packet, m_codecContext, m_frame, m_log, m_scale);
             if (response < 0)
                 break;
             // stop it, otherwise we'll be saving hundreds of frames
-            if (--packet_count_to_process <= 0) break;
+            if(index < m_cache.size()) {
+                break;
+            }
         }
         // https://ffmpeg.org/doxygen/trunk/group__lavc__packet.html#ga63d5a489b419bd5d45cfd09091cbcbc2
-        av_packet_unref(pPacket);
+        av_packet_unref(m_packet);
     }
 
-    log << "releasing all the resources" << std::endl;
-
-    avformat_close_input(&pFormatContext);
-    av_packet_free(&pPacket);
-    av_frame_free(&pFrame);
-    avcodec_free_context(&pCodecContext);
-    return 0;
+    if(index < m_cache.size()) {
+        return m_cache[index];
+    } else {
+        m_log << "frame_count: " << frame_count() << std::endl;
+        throw std::runtime_error("no frame for index: " + std::to_string(index));
+    }
 }
 
-int mp4_decoder::decode_packet(std::vector<pixel_primitives::bitmap> &dst_btmps, AVPacket *pPacket, AVCodecContext *pCodecContext, AVFrame *pFrame, std::ostream &log, double scale)
-{
+std::size_t mp4_decoder::frame_count() const {
+    return m_formatContext ? m_formatContext->streams[m_video_stream_index]->nb_frames - 1 : 0;
+}
+
+std::uint8_t mp4_decoder::canal(AVFrame *frame, std::size_t canal_no, std::size_t x, std::size_t y, std::size_t width) {
+    return frame->data[canal_no][y * frame->linesize[canal_no] * frame->linesize[canal_no] / width + x * frame->linesize[canal_no] / width];
+}
+
+int mp4_decoder::decode_packet(std::vector<pixel_primitives::bitmap> &dst_btmps, AVPacket *pPacket, AVCodecContext *pCodecContext, AVFrame *pFrame, std::ostream &log, double scale) {
     // Supply raw packet data as input to a decoder
     // https://ffmpeg.org/doxygen/trunk/group__lavc__decoding.html#ga58bc4bf1e0ac59e27362597e467efff3
     int response = avcodec_send_packet(pCodecContext, pPacket);
@@ -260,8 +266,8 @@ int mp4_decoder::decode_packet(std::vector<pixel_primitives::bitmap> &dst_btmps,
                     pixel_primitives::pixel(dst_btmps.back(), x, y)
                             = 0xff000000
                             | std::uint32_t(r) << 16
-                            | std::uint32_t(g) << 8
-                            | std::uint32_t(b) << 0;
+                                                  | std::uint32_t(g) << 8
+                                                  | std::uint32_t(b) << 0;
                 }
             }
 
@@ -283,4 +289,12 @@ void mp4_decoder::save_gray_frame(std::uint8_t *buf, int wrap, int xsize, int ys
     for (i = 0; i < ysize; i++)
         fwrite(buf + i * wrap, 1, xsize, f);
     fclose(f);
+}
+
+mp4_decoder::~mp4_decoder() {
+    m_log << "releasing all the resources" << std::endl;
+    if(m_formatContext) { avformat_close_input(&m_formatContext); }
+    if(m_packet) { av_packet_free(&m_packet); }
+    if(m_frame) { av_frame_free(&m_frame); }
+    if(m_codecContext) { avcodec_free_context(&m_codecContext); }
 }
