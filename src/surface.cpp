@@ -1,9 +1,7 @@
 #include "surface.h"
 #include <sys/ioctl.h>
-#include <iostream>
-#include "color.h"
 #include <unistd.h>
-
+#include <ostream>
 
 bool surface::auto_resize() const {
     return m_auto_resize;
@@ -13,12 +11,27 @@ void surface::set_auto_resize(bool newAuto_resize) {
     m_auto_resize = newAuto_resize;
 }
 
-surface::surface(colorizer *colorizer, bool auto_resize, uint32_t mask, bool ignore_alpha, double symbol_wh_fraction)
-    : m_colorizer(colorizer),
+surface::surface(std::ostream &output, const colorizer *colorizer, const std::string &gradient, double contrast, bool auto_resize, uint32_t mask, bool ignore_alpha, double symbol_wh_fraction)
+    : m_output(output),
+      m_colorizer(colorizer),
+      m_gradient(gradient),
+      m_contrast(contrast),
       m_auto_resize(auto_resize),
       m_mask(mask),
       m_ignore_alpha(ignore_alpha),
       m_symbol_wh_fraction(symbol_wh_fraction) {}
+
+
+char surface::charFromArgb(uint32_t argb) const {
+    return charFromBrightness((std::uint8_t(argb) + std::uint8_t(argb >> 8) + std::uint8_t(argb >> 16)) * std::uint8_t(argb >> 24) / 3 / 0xff);
+}
+
+char surface::charFromBrightness(uint8_t brightness) const {
+    if(std::abs(m_contrast - 1) >= std::numeric_limits<double>::epsilon()) {
+        brightness = (brightness - 0x88) * m_contrast + 0x88;
+    }
+    return m_gradient[brightness * (m_gradient.size() - 1) / 0xff];
+}
 
 std::pair<std::size_t, std::size_t> surface::console_size(int fd) const {
     int cols = 80;
@@ -52,7 +65,8 @@ void surface::set_size(std::size_t w, std::size_t h) {
     }
 }
 
-void surface::update() {
+std::size_t surface::update() {
+    std::size_t result = 0;
     if(m_bitmap && m_bitmap.width > 0 && m_bitmap.height > 0) {
         const auto w = m_bitmap.width / m_symbol_wh_fraction;
         const auto h = m_bitmap.height;
@@ -80,16 +94,18 @@ void surface::update() {
                         lastColorCode = cc;
                     }
                 }
-                buffer += character::argbToChar(argb);
+                buffer += charFromArgb(argb);
             }
             buffer += '\n';
         }
-        std::cout.write(buffer.c_str(), buffer.size());
+        m_output.write(buffer.c_str(), buffer.size());
+        result = buffer.size();
     }
     if(m_auto_resize) {
         const auto& size = console_size(STDOUT_FILENO);
         set_size(size.first, size.second);
     }
+    return result;
 }
 
 surface::~surface() {

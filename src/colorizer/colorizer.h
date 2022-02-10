@@ -68,20 +68,16 @@ public:
 };
 
 class ansi_true_colorizer : public colorizer {
+    std::uint8_t m_deterioration;
 public:
     static inline const char* reset = "\033[0m";
+
+    ansi_true_colorizer(std::uint8_t deterioration = 1);
 
     // colorizer interface
 public:
     virtual std::string beginSeq(std::uint32_t argb) const override;
     virtual std::string endSeq() const override;
-};
-
-
-struct character {
-    static constexpr const char gradient[] = " .:!/r(l1Z4H9W8$@";
-    static char argbToChar(std::uint32_t argb);
-    static char brightnessToChar(std::uint8_t brightness);
 };
 
 #endif // COLOR_H

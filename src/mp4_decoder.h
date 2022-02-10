@@ -6,6 +6,9 @@ extern "C" {
 #endif
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
+#include <libswscale/swscale.h>
+#include <libavutil/pixfmt.h>
+#include <libavutil/imgutils.h>
 #ifdef __cplusplus
 }
 #endif
@@ -33,10 +36,10 @@ public:
 
     std::size_t frame_count() const;
 
-    static std::uint8_t canal(AVFrame* frame, std::size_t canal_no, std::size_t x, std::size_t y, std::size_t width);
+    static std::uint8_t canal8(AVFrame* frame, std::size_t canal_no, std::size_t x, std::size_t y, std::size_t width);
+    static std::uint32_t canal32(AVFrame* frame, std::size_t canal_no, std::size_t x, std::size_t y, std::size_t width);
 
     static int decode_packet(std::vector<pixel_primitives::bitmap>& dst_btmps, AVPacket *pPacket, AVCodecContext *pCodecContext, AVFrame *pFrame, std::ostream &log, double scale);
-    static void save_gray_frame(uint8_t *buf, int wrap, int xsize, int ysize, char *filename, std::ostream &log);
 
     ~mp4_decoder();
 };

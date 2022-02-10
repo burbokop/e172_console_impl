@@ -6,8 +6,7 @@
 #include "png_reader.h"
 #include <fstream>
 
-using namespace std;
-
+#include <thread>
 
 inline pixel_primitives::bitmap sdl_surface_to_bitmap(SDL_Surface* surf) {
     return pixel_primitives::bitmap {
@@ -23,10 +22,15 @@ int main() {
 
     //return 0;
 
-    mp4_decoder decoder("/home/borys/Videos/video_2022-02-10_12-08-58.mp4", std::cout, 1 / 8.);
+    std::iostream null (0);
+
+
+    mp4_decoder decoder("/home/borys/Videos/PsychedelicPornCrumpetsCornflake.mp4", std::cout, 1 / 4.);
+    //mp4_decoder decoder("/home/borys/Videos/video_2022-02-10_12-08-58.mp4", null, 1 / 8.);
 
     std::cout << "frame count: " << decoder.frame_count() << std::endl;
     //return 0;
+
 
     std::ifstream istr("/home/borys/Pictures/sculpture_64.png");
     if(!istr.is_open()) {
@@ -41,14 +45,14 @@ int main() {
 
     auto sdl_surface = SDL_GetWindowSurface(window);
 
-    cout << "Finished" << endl;
-
     painter p;
 
     ansi_colorizer ansi_colorizer;
-    ansi_true_colorizer ansi_true_colorizer;
+    ansi_true_colorizer ansi_true_colorizer = 32;
 
-    surface s(&ansi_true_colorizer, true, 0xffffffff, false);
+    //std::ofstream out("output.ansi", std::ios::out);
+
+    surface s(std::cout, &ansi_true_colorizer, surface::default_gradient, 2, true, 0xffffffff, false);
 
     std::size_t last_w = 0;
     std::size_t last_h = 0;
@@ -73,7 +77,7 @@ int main() {
             pixel_primitives::blit(s.bitmap(), decoder.frame(frame_index), 0, 0);
 
 
-            if(true && (s.bitmap().width != last_w || s.bitmap().height != last_h)) {
+            if(false && (s.bitmap().width != last_w || s.bitmap().height != last_h)) {
                 SDL_FreeSurface(sdl_surface);
                 SDL_SetWindowSize(window, s.bitmap().width, s.bitmap().height);
                 sdl_surface = SDL_GetWindowSurface(window);
@@ -85,7 +89,7 @@ int main() {
             auto btmp = sdl_surface_to_bitmap(sdl_surface);
             pixel_primitives::copy(btmp, s.bitmap());
 
-            //pixel_primitives::blit(btmp, vvv[frame_index], 0, 0);
+            pixel_primitives::blit(btmp, decoder.frame(frame_index), 0, 0);
 
             //if(frameChangeTimer.check()) {
             ++frame_index;
@@ -98,7 +102,6 @@ int main() {
             SDL_UpdateWindowSurface(window);
         }
     }
-
 
     return 0;
 }

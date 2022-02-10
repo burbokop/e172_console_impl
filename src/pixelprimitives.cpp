@@ -229,10 +229,10 @@ std::uint32_t pixel_primitives::blend_argb(std::uint32_t top, std::uint32_t bott
 }
 
 void pixel_primitives::blit(bitmap &dst_btmp, const bitmap &src_btmp, std::size_t offset_x, std::size_t offset_y, std::size_t w, std::size_t h) {
-    w = std::min(w, src_btmp.width);
-    h = std::min(h, src_btmp.height);
-    w = std::min(w, dst_btmp.width);
-    h = std::min(h, dst_btmp.height);
+    //w = std::min(w, src_btmp.width);
+    //h = std::min(h, src_btmp.height);
+    //w = std::min(w, dst_btmp.width);
+    //h = std::min(h, dst_btmp.height);
 
     for (int y = 0; y < h; ++y) {
         for (int x = 0; x < w; ++x) {

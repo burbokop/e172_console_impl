@@ -13,7 +13,7 @@ namespace e172 {
 class ConsoleRenderer : public e172::AbstractRenderer {
     surface m_surface;
 public:
-    ConsoleRenderer();
+    ConsoleRenderer(std::ostream &output);
 
     // AbstractRenderer interface
 protected:

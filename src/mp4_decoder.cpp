@@ -1,5 +1,6 @@
 #include "mp4_decoder.h"
 
+
 mp4_decoder::mp4_decoder(const char *path,
         std::ostream &log,
         double scale
@@ -182,8 +183,12 @@ std::size_t mp4_decoder::frame_count() const {
     return m_formatContext ? m_formatContext->streams[m_video_stream_index]->nb_frames - 1 : 0;
 }
 
-std::uint8_t mp4_decoder::canal(AVFrame *frame, std::size_t canal_no, std::size_t x, std::size_t y, std::size_t width) {
+std::uint8_t mp4_decoder::canal8(AVFrame *frame, std::size_t canal_no, std::size_t x, std::size_t y, std::size_t width) {
     return frame->data[canal_no][y * frame->linesize[canal_no] * frame->linesize[canal_no] / width + x * frame->linesize[canal_no] / width];
+}
+
+std::uint32_t mp4_decoder::canal32(AVFrame *frame, std::size_t canal_no, std::size_t x, std::size_t y, std::size_t width) {
+    return reinterpret_cast<std::uint32_t*>(frame->data[canal_no])[y * frame->linesize[canal_no] * frame->linesize[canal_no] / width + x * frame->linesize[canal_no] / width];
 }
 
 int mp4_decoder::decode_packet(std::vector<pixel_primitives::bitmap> &dst_btmps, AVPacket *pPacket, AVCodecContext *pCodecContext, AVFrame *pFrame, std::ostream &log, double scale) {
@@ -248,8 +253,11 @@ int mp4_decoder::decode_packet(std::vector<pixel_primitives::bitmap> &dst_btmps,
                 log << "\tlen 7: " << pFrame->linesize[7] << std::endl;
             }
 
-            const auto scaled_w = pFrame->width * scale;
-            const auto scaled_h = pFrame->height * scale;
+            //const auto scaled_w = pFrame->width * scale;
+            //const auto scaled_h = pFrame->height * scale;
+
+            const auto scaled_w = pFrame->width;
+            const auto scaled_h = pFrame->height;
 
             dst_btmps.push_back(pixel_primitives::bitmap {
                                     new std::uint32_t[scaled_w * scaled_h],
@@ -257,39 +265,80 @@ int mp4_decoder::decode_packet(std::vector<pixel_primitives::bitmap> &dst_btmps,
                                     static_cast<size_t>(scaled_h)
                                 });
 
+            SwsContext* img_convert_ctx = sws_getContext(
+                        pFrame->width,
+                        pFrame->height,
+                        pCodecContext->pix_fmt,
+                        scaled_h,
+                        scaled_h,
+                        AV_PIX_FMT_BGR32,
+                        SWS_BICUBIC,
+                        nullptr,
+                        nullptr,
+                        nullptr
+                        );
+
+            auto picureRGB = av_frame_alloc();
+
+            std::size_t numBytes = avpicture_get_size(AV_PIX_FMT_BGR32, pCodecContext->width,
+                              pCodecContext->height);
+            auto buffer = new std::uint8_t[numBytes];
+
+            avpicture_fill((AVPicture *)picureRGB, buffer, AV_PIX_FMT_BGR32,
+                     pCodecContext->width, pCodecContext->height);
+
+            sws_scale(
+                        img_convert_ctx,
+                        pFrame->data,
+                        pFrame->linesize,
+                        0,
+                        pCodecContext->height,
+                        picureRGB->data,
+                        picureRGB->linesize
+                        );
+
+            if(log_frame) {
+                log << "\tw: " << picureRGB->width << ", h: " << picureRGB->height << std::endl;
+                log << "\tlen_rgb 0: " << picureRGB->linesize[0] << std::endl;
+                log << "\tlen_rgb 1: " << picureRGB->linesize[1] << std::endl;
+                log << "\tlen_rgb 2: " << picureRGB->linesize[2] << std::endl;
+                log << "\tlen_rgb 3: " << picureRGB->linesize[3] << std::endl;
+                log << "\tlen_rgb 4: " << picureRGB->linesize[4] << std::endl;
+                log << "\tlen_rgb 5: " << picureRGB->linesize[5] << std::endl;
+                log << "\tlen_rgb 6: " << picureRGB->linesize[6] << std::endl;
+                log << "\tlen_rgb 7: " << picureRGB->linesize[7] << std::endl;
+            }
+
+
             for(std::size_t y = 0; y < scaled_h; ++y) {
                 for(std::size_t x = 0; x < scaled_w; ++x) {
-                    const auto g = canal(pFrame, 0, x, y, scaled_w);
-                    const auto b = canal(pFrame, 1, x, y, scaled_w);
-                    const auto r = canal(pFrame, 2, x, y, scaled_w);
+                    std::uint32_t* bbb = reinterpret_cast<std::uint32_t*>(picureRGB->data[0]);
+
+                    //log << "sizeof (bbb): " << sizeof (bbb) << std::endl;
+
+                    const auto canal0 = bbb[x * y + picureRGB->linesize[0]];
+
+                    //const auto canal0 = canal32(picureRGB, 0, x, y, scaled_w);
+
+                    pixel_primitives::pixel(dst_btmps.back(), x, y) = canal0;
+                    //const auto g = canal(picureRGB, 1, x, y, scaled_w);
+                    //const auto b = canal(picureRGB, 2, x, y, scaled_w);
                     //log << "c: 0x" << std::hex << canal << std::dec << " [ " << x << ", " << y << " ]" << std::endl;
-                    pixel_primitives::pixel(dst_btmps.back(), x, y)
-                            = 0xff000000
-                            | std::uint32_t(r) << 16
-                                                  | std::uint32_t(g) << 8
-                                                  | std::uint32_t(b) << 0;
+                    //pixel_primitives::pixel(dst_btmps.back(), x, y)
+                    //        = 0xff000000
+                    //        | std::uint32_t(r) << 16
+                    //        | std::uint32_t(g) << 8
+                    //        | std::uint32_t(b) << 0;
                 }
             }
 
-            save_gray_frame(pFrame->data[0], pFrame->linesize[0], pFrame->width, pFrame->height, frame_filename, log);
+            av_free(buffer);
+            av_free(picureRGB);
         }
     }
     return 0;
 }
 
-void mp4_decoder::save_gray_frame(std::uint8_t *buf, int wrap, int xsize, int ysize, char *filename, std::ostream &log) {
-    FILE *f;
-    int i;
-    f = fopen(filename,"w");
-    // writing the minimal required header for a pgm file format
-    // portable graymap format -> https://en.wikipedia.org/wiki/Netpbm_format#PGM_example
-    fprintf(f, "P5\n%d %d\n%d\n", xsize, ysize, 255);
-
-    // writing line by line
-    for (i = 0; i < ysize; i++)
-        fwrite(buf + i * wrap, 1, xsize, f);
-    fclose(f);
-}
 
 mp4_decoder::~mp4_decoder() {
     m_log << "releasing all the resources" << std::endl;

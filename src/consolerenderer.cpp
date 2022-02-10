@@ -1,9 +1,7 @@
 #include "consolerenderer.h"
 
-ConsoleRenderer::ConsoleRenderer()
-{
-
-}
+ConsoleRenderer::ConsoleRenderer(std::ostream &output)
+    : m_surface(surface(output)) {}
 
 bool ConsoleRenderer::update() {
     m_surface.update();

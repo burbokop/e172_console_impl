@@ -8,8 +8,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 add_library(console_impl SHARED
     ${CMAKE_CURRENT_LIST_DIR}/src/consolerenderer.h
     ${CMAKE_CURRENT_LIST_DIR}/src/consolerenderer.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/src/color.h
-    ${CMAKE_CURRENT_LIST_DIR}/src/color.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/src/colorizer/colorizer.h
+    ${CMAKE_CURRENT_LIST_DIR}/src/colorizer/colorizer.cpp
     ${CMAKE_CURRENT_LIST_DIR}/src/surface.h
     ${CMAKE_CURRENT_LIST_DIR}/src/surface.cpp
     ${CMAKE_CURRENT_LIST_DIR}/src/pixelprimitives.h
