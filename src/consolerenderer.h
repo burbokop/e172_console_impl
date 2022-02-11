@@ -11,7 +11,7 @@ namespace e172 {
 }
 
 class ConsoleRenderer : public e172::AbstractRenderer {
-    surface m_surface;
+    console_writer m_writer;
 public:
     ConsoleRenderer(std::ostream &output);
 

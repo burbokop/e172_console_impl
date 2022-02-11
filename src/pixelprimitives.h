@@ -6,7 +6,7 @@
 namespace pixel_primitives {
 
 struct bitmap {
-    std::uint32_t* matrix = nullptr;
+    std::uint32_t *matrix = nullptr;
     std::size_t width = 0;
     std::size_t height = 0;
     operator std::uint32_t*() { return matrix; }
@@ -64,11 +64,10 @@ inline void draw_horizontal_line(
     for (int i = 0; i < len; i++) pixel(btmp, point_x + i , point_y) = argb;
 }
 
-void draw_square(
-        bitmap &btmp,
+void draw_square(bitmap &btmp,
         std::size_t point_x,
         std::size_t point_y,
-        std::size_t len,
+        std::size_t radius,
         std::uint32_t argb
         );
 
@@ -121,6 +120,10 @@ void copy_flipped(bitmap &dst_btmp, const bitmap &src_btmp, bool x_flip, bool y_
 inline void copy(bitmap &dst_btmp, const bitmap &src_btmp) {
     copy_flipped(dst_btmp, src_btmp, false, false);
 }
+
+
+bitmap cut_out(const bitmap &src_btmp, int x, int y, int w, int h);
+
 
 void blit(
         bitmap &dst_btmp,

@@ -74,7 +74,8 @@ void pixel_primitives::draw_line(bitmap &btmp, std::size_t point0_x, std::size_t
     }
 }
 
-void pixel_primitives::draw_square(bitmap &btmp, std::size_t point_x, std::size_t point_y, std::size_t len, uint32_t argb) {
+void pixel_primitives::draw_square(bitmap &btmp, std::size_t point_x, std::size_t point_y, std::size_t radius, uint32_t argb) {
+    const std::size_t len = radius * 2;
     for(std::size_t i = 0; i < len; i++) {
         pixel(btmp, point_x + i, point_y) = argb;
         pixel(btmp, point_x + i, point_y + len) = argb;
@@ -241,3 +242,4 @@ void pixel_primitives::blit(bitmap &dst_btmp, const bitmap &src_btmp, std::size_
         }
     }
 }
+

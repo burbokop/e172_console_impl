@@ -54,9 +54,9 @@ int main() {
     ansi_colorizer ansi_colorizer;
     ansi_true_colorizer ansi_true_colorizer = 32;
 
-    //std::ofstream out("output.ansi", std::ios::out);
+    std::ofstream out("output.ansi", std::ios::out);
 
-    surface s(std::cout, &ansi_true_colorizer, surface::default_gradient, 1, true, 0xffffffff, false);
+    console_writer s(std::cout, &ansi_true_colorizer, console_writer::default_gradient, 1, true, 0xffffffff, false);
 
     std::size_t last_w = 0;
     std::size_t last_h = 0;
@@ -66,6 +66,7 @@ int main() {
 
     e172::ElapsedTimer frameChangeTimer(1000 / 4);
     std::size_t frame_index = 0;
+
     while (true) {
         if(updateTimer.check()) {
             pixel_primitives::fill_area(s.bitmap(), 0, 0, s.bitmap().width, s.bitmap().height, 0x00000000);
@@ -102,7 +103,7 @@ int main() {
 
             SDL_UnlockSurface(sdl_surface);
 
-            s.update();
+            s.write_frame();
             SDL_UpdateWindowSurface(window);
         }
     }

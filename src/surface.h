@@ -1,11 +1,12 @@
 #ifndef SURFACE_H
 #define SURFACE_H
 
+#include <optional>
 #include <vector>
 #include "pixelprimitives.h"
 #include "colorizer/colorizer.h"
 
-class surface {
+class console_writer {
     pixel_primitives::bitmap m_bitmap;
     std::ostream& m_output;
     const colorizer *m_colorizer;
@@ -16,7 +17,7 @@ class surface {
     bool m_ignore_alpha;
     double m_symbol_wh_fraction;
 public:
-    surface(
+    console_writer(
             std::ostream& output,
             const colorizer *colorizer = nullptr,
             const std::string &gradient = default_gradient,
@@ -31,16 +32,20 @@ public:
     char charFromArgb(std::uint32_t argb) const;
     char charFromBrightness(std::uint8_t brightness) const;
 
-    std::pair<std::size_t, std::size_t> console_size(int fd) const;
-    void set_size(std::size_t w, std::size_t h);
-    std::size_t update();
+    static std::optional<int> output_stream_descriptor(const std::ostream& stream);
+    static std::pair<std::size_t, std::size_t> output_stream_size(const std::ostream& stream, double wh_fraction = 1);
+
+    void set_frame_size(std::size_t w, std::size_t h);
+    std::size_t write_frame();
 
     pixel_primitives::bitmap& bitmap() { return m_bitmap; }
     const pixel_primitives::bitmap& bitmap() const { return m_bitmap; }
 
-    ~surface();
+    ~console_writer();
     bool auto_resize() const;
     void set_auto_resize(bool newAuto_resize);
+    std::ostream &output() const;
+    double symbol_wh_fraction() const;
 };
 
 #endif // SURFACE_H
