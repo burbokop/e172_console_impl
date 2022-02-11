@@ -143,7 +143,21 @@ mp4_decoder::mp4_decoder(const char *path,
     }
 
 
-
+    m_destinationWidth = m_codecContext->width * scale;
+    m_destinationHeight = m_codecContext->height * scale;
+    m_destinationFormat = AV_PIX_FMT_RGB32;
+    m_imageConvertContext = sws_getContext(
+                m_codecContext->width,
+                m_codecContext->height,
+                m_codecContext->pix_fmt,
+                m_destinationWidth,
+                m_destinationHeight,
+                m_destinationFormat,
+                SWS_BICUBIC,
+                nullptr,
+                nullptr,
+                nullptr
+                );
 }
 
 pixel_primitives::bitmap &mp4_decoder::frame(std::size_t index) const {
@@ -159,7 +173,17 @@ pixel_primitives::bitmap &mp4_decoder::frame(std::size_t index) const {
         // if it's the video stream
         if (m_packet->stream_index == m_video_stream_index) {
             m_log << "AVPacket->pts " << m_packet->pts << std::endl;
-            response = decode_packet(m_cache, m_packet, m_codecContext, m_frame, m_log, m_scale);
+            response = decode_packet(
+                        m_cache,
+                        m_packet,
+                        m_codecContext,
+                        m_imageConvertContext,
+                        m_frame,
+                        m_log,
+                        m_destinationWidth,
+                        m_destinationHeight,
+                        m_destinationFormat
+                        );
             if (response < 0)
                 break;
             // stop it, otherwise we'll be saving hundreds of frames
@@ -191,7 +215,7 @@ std::uint32_t mp4_decoder::canal32(AVFrame *frame, std::size_t canal_no, std::si
     return reinterpret_cast<std::uint32_t*>(frame->data[canal_no])[y * frame->linesize[canal_no] * frame->linesize[canal_no] / width + x * frame->linesize[canal_no] / width];
 }
 
-int mp4_decoder::decode_packet(std::vector<pixel_primitives::bitmap> &dst_btmps, AVPacket *pPacket, AVCodecContext *pCodecContext, AVFrame *pFrame, std::ostream &log, double scale) {
+int mp4_decoder::decode_packet(std::vector<pixel_primitives::bitmap> &dst_btmps, AVPacket *pPacket, AVCodecContext *pCodecContext, SwsContext *imageConvertContext, AVFrame *pFrame, std::ostream &log, std::size_t destinationWidth, std::size_t destinationHeight, AVPixelFormat destinationFormat) {
     // Supply raw packet data as input to a decoder
     // https://ffmpeg.org/doxygen/trunk/group__lavc__decoding.html#ga58bc4bf1e0ac59e27362597e467efff3
     int response = avcodec_send_packet(pCodecContext, pPacket);
@@ -214,7 +238,7 @@ int mp4_decoder::decode_packet(std::vector<pixel_primitives::bitmap> &dst_btmps,
         }
 
         if (response >= 0) {
-            bool log_frame = true;
+            bool log_frame = false;
 
             if(log_frame) {
                 log
@@ -253,87 +277,33 @@ int mp4_decoder::decode_packet(std::vector<pixel_primitives::bitmap> &dst_btmps,
                 log << "\tlen 7: " << pFrame->linesize[7] << std::endl;
             }
 
-            //const auto scaled_w = pFrame->width * scale;
-            //const auto scaled_h = pFrame->height * scale;
 
-            const auto scaled_w = pFrame->width;
-            const auto scaled_h = pFrame->height;
+            pixel_primitives::bitmap btmp {
+                new std::uint32_t[destinationWidth * destinationHeight],
+                static_cast<size_t>(destinationWidth),
+                static_cast<size_t>(destinationHeight)
+            };
 
-            dst_btmps.push_back(pixel_primitives::bitmap {
-                                    new std::uint32_t[scaled_w * scaled_h],
-                                    static_cast<size_t>(scaled_w),
-                                    static_cast<size_t>(scaled_h)
-                                });
-
-            SwsContext* img_convert_ctx = sws_getContext(
-                        pFrame->width,
-                        pFrame->height,
-                        pCodecContext->pix_fmt,
-                        scaled_h,
-                        scaled_h,
-                        AV_PIX_FMT_BGR32,
-                        SWS_BICUBIC,
-                        nullptr,
-                        nullptr,
-                        nullptr
+            AVPicture picureRGB;
+            avpicture_fill(
+                        &picureRGB,
+                        reinterpret_cast<std::uint8_t*>(btmp.matrix),
+                        destinationFormat,
+                        destinationWidth,
+                        destinationHeight
                         );
 
-            auto picureRGB = av_frame_alloc();
-
-            std::size_t numBytes = avpicture_get_size(AV_PIX_FMT_BGR32, pCodecContext->width,
-                              pCodecContext->height);
-            auto buffer = new std::uint8_t[numBytes];
-
-            avpicture_fill((AVPicture *)picureRGB, buffer, AV_PIX_FMT_BGR32,
-                     pCodecContext->width, pCodecContext->height);
-
             sws_scale(
-                        img_convert_ctx,
+                        imageConvertContext,
                         pFrame->data,
                         pFrame->linesize,
                         0,
                         pCodecContext->height,
-                        picureRGB->data,
-                        picureRGB->linesize
+                        picureRGB.data,
+                        picureRGB.linesize
                         );
 
-            if(log_frame) {
-                log << "\tw: " << picureRGB->width << ", h: " << picureRGB->height << std::endl;
-                log << "\tlen_rgb 0: " << picureRGB->linesize[0] << std::endl;
-                log << "\tlen_rgb 1: " << picureRGB->linesize[1] << std::endl;
-                log << "\tlen_rgb 2: " << picureRGB->linesize[2] << std::endl;
-                log << "\tlen_rgb 3: " << picureRGB->linesize[3] << std::endl;
-                log << "\tlen_rgb 4: " << picureRGB->linesize[4] << std::endl;
-                log << "\tlen_rgb 5: " << picureRGB->linesize[5] << std::endl;
-                log << "\tlen_rgb 6: " << picureRGB->linesize[6] << std::endl;
-                log << "\tlen_rgb 7: " << picureRGB->linesize[7] << std::endl;
-            }
-
-
-            for(std::size_t y = 0; y < scaled_h; ++y) {
-                for(std::size_t x = 0; x < scaled_w; ++x) {
-                    std::uint32_t* bbb = reinterpret_cast<std::uint32_t*>(picureRGB->data[0]);
-
-                    //log << "sizeof (bbb): " << sizeof (bbb) << std::endl;
-
-                    const auto canal0 = bbb[x * y + picureRGB->linesize[0]];
-
-                    //const auto canal0 = canal32(picureRGB, 0, x, y, scaled_w);
-
-                    pixel_primitives::pixel(dst_btmps.back(), x, y) = canal0;
-                    //const auto g = canal(picureRGB, 1, x, y, scaled_w);
-                    //const auto b = canal(picureRGB, 2, x, y, scaled_w);
-                    //log << "c: 0x" << std::hex << canal << std::dec << " [ " << x << ", " << y << " ]" << std::endl;
-                    //pixel_primitives::pixel(dst_btmps.back(), x, y)
-                    //        = 0xff000000
-                    //        | std::uint32_t(r) << 16
-                    //        | std::uint32_t(g) << 8
-                    //        | std::uint32_t(b) << 0;
-                }
-            }
-
-            av_free(buffer);
-            av_free(picureRGB);
+            dst_btmps.push_back(btmp);
         }
     }
     return 0;
@@ -346,4 +316,5 @@ mp4_decoder::~mp4_decoder() {
     if(m_packet) { av_packet_free(&m_packet); }
     if(m_frame) { av_frame_free(&m_frame); }
     if(m_codecContext) { avcodec_free_context(&m_codecContext); }
+    if(m_imageConvertContext) { sws_freeContext(m_imageConvertContext); }
 }

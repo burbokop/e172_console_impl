@@ -27,8 +27,12 @@ class mp4_decoder {
     AVPacket *m_packet = nullptr;
     AVFrame *m_frame = nullptr;
     AVCodecContext *m_codecContext = nullptr;
+    SwsContext* m_imageConvertContext = nullptr;
     int m_video_stream_index;
     mutable std::vector<pixel_primitives::bitmap> m_cache;
+    std::size_t m_destinationWidth;
+    std::size_t m_destinationHeight;
+    AVPixelFormat m_destinationFormat;
 public:
     mp4_decoder(const char *path, std::ostream &log, double scale);
 
@@ -39,7 +43,17 @@ public:
     static std::uint8_t canal8(AVFrame* frame, std::size_t canal_no, std::size_t x, std::size_t y, std::size_t width);
     static std::uint32_t canal32(AVFrame* frame, std::size_t canal_no, std::size_t x, std::size_t y, std::size_t width);
 
-    static int decode_packet(std::vector<pixel_primitives::bitmap>& dst_btmps, AVPacket *pPacket, AVCodecContext *pCodecContext, AVFrame *pFrame, std::ostream &log, double scale);
+    static int decode_packet(
+            std::vector<pixel_primitives::bitmap>& dst_btmps,
+            AVPacket *pPacket,
+            AVCodecContext *pCodecContext,
+            SwsContext* imageConvertContext,
+            AVFrame *pFrame,
+            std::ostream &log,
+            std::size_t destinationWidth,
+            std::size_t destinationHeight,
+            AVPixelFormat destinationFormat
+            );
 
     ~mp4_decoder();
 };

@@ -25,8 +25,12 @@ int main() {
     std::iostream null (0);
 
 
-    mp4_decoder decoder("/home/borys/Videos/PsychedelicPornCrumpetsCornflake.mp4", std::cout, 1 / 4.);
-    //mp4_decoder decoder("/home/borys/Videos/video_2022-02-10_12-08-58.mp4", null, 1 / 8.);
+    //mp4_decoder decoder("/home/borys/Videos/a.mp4", std::cout, 1 / 4.);
+    //mp4_decoder decoder("/home/borys/Videos/DeadPiratesUGO.mp4", null, 1 / 4.);
+
+    mp4_decoder decoder("/home/borys/Videos/video_2022-02-10_12-08-58.mp4", null, 1 / 8.);
+
+
 
     std::cout << "frame count: " << decoder.frame_count() << std::endl;
     //return 0;
@@ -52,7 +56,7 @@ int main() {
 
     //std::ofstream out("output.ansi", std::ios::out);
 
-    surface s(std::cout, &ansi_true_colorizer, surface::default_gradient, 2, true, 0xffffffff, false);
+    surface s(std::cout, &ansi_true_colorizer, surface::default_gradient, 1, true, 0xffffffff, false);
 
     std::size_t last_w = 0;
     std::size_t last_h = 0;
@@ -77,7 +81,7 @@ int main() {
             pixel_primitives::blit(s.bitmap(), decoder.frame(frame_index), 0, 0);
 
 
-            if(false && (s.bitmap().width != last_w || s.bitmap().height != last_h)) {
+            if(true && (s.bitmap().width != last_w || s.bitmap().height != last_h)) {
                 SDL_FreeSurface(sdl_surface);
                 SDL_SetWindowSize(window, s.bitmap().width, s.bitmap().height);
                 sdl_surface = SDL_GetWindowSurface(window);
