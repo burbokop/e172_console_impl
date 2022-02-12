@@ -94,28 +94,33 @@ void pixel_primitives::fill_square(bitmap &btmp, std::size_t point_x, std::size_
 }
 
 void pixel_primitives::draw_rect(bitmap &btmp, std::size_t point0_x, std::size_t point0_y, std::size_t point1_x, std::size_t point1_y, uint32_t argb) {
-    std::int64_t dx = point1_x - point0_x, dy = point1_y - point0_y;
+    const auto& min_x = std::min(point1_x, point0_x);
+    const auto& max_x = std::max(point1_x, point0_x);
+    const auto& min_y = std::min(point1_y, point0_y);
+    const auto& max_y = std::max(point1_y, point0_y);
+
+    std::int64_t dx = max_x - min_x, dy = max_y - min_y;
     if (dx >= 0) {
         for (std::int64_t i = 0; i <= dx; i++) {
-            pixel(btmp, point0_x + i, point0_y) = argb;
-            pixel(btmp, point0_x + i, point0_y + dy) = argb;
+            pixel(btmp, min_x + i, min_y) = argb;
+            pixel(btmp, min_x + i, min_y + dy) = argb;
         }
     } else if (dx < 0) {
         for (std::int64_t i = 0; i >= dx; i--) {
-            pixel(btmp, point0_x + i, point0_y) = argb;
-            pixel(btmp, point0_x + i, point0_y + dy) = argb;
+            pixel(btmp, min_x + i, min_y) = argb;
+            pixel(btmp, min_x + i, min_y + dy) = argb;
         }
     }
 
     if (dy >= 0) {
         for (std::int64_t i = 0; i <= dy; i++) {
-            pixel(btmp, point0_x, point0_y + i) = argb;
-            pixel(btmp, point0_x + dx, point0_y + i) = argb;
+            pixel(btmp, min_x, min_y + i) = argb;
+            pixel(btmp, min_x + dx, min_y + i) = argb;
         }
     } else if (dy < 0) {
         for (std::int64_t i = 0; i >= dy; i--) {
-            pixel(btmp, point0_x, point0_y + i) = argb;
-            pixel(btmp, point0_x + dx, point0_y + i) = argb;
+            pixel(btmp, min_x, min_y + i) = argb;
+            pixel(btmp, min_x + dx, min_y + i) = argb;
         }
     }
 }
@@ -243,13 +248,66 @@ void pixel_primitives::blit(bitmap &dst_btmp, const bitmap &src_btmp, std::size_
     }
 }
 
+#include <iostream>
+#include <thread>
+void pixel_primitives::blit_transformed(
+        bitmap &dst_btmp,
+        const bitmap &src_btmp,
+        const std::complex<double> &rotor,
+        const double scaler,
+        std::size_t center_x,
+        std::size_t center_y
+        ) {
+    const auto& lt = rotor * std::complex<double>(-double(src_btmp.width) / 2 * scaler, -double(src_btmp.height) / 2 * scaler);
+    const auto& rt = rotor * std::complex<double>( double(src_btmp.width) / 2 * scaler, -double(src_btmp.height) / 2 * scaler);
+    const auto& lb = rotor * std::complex<double>(-double(src_btmp.width) / 2 * scaler,  double(src_btmp.height) / 2 * scaler);
+    const auto& rb = rotor * std::complex<double>( double(src_btmp.width) / 2 * scaler,  double(src_btmp.height) / 2 * scaler);
+    const auto real_arr = { lt.real(), rt.real(), lb.real(), rb.real() };
+    const auto imgn_arr = { lt.imag(), rt.imag(), lb.imag(), rb.imag() };
+    const auto min_x = std::min_element(real_arr.begin(), real_arr.end());
+    const auto max_x = std::max_element(real_arr.begin(), real_arr.end());
+    const auto min_y = std::min_element(imgn_arr.begin(), imgn_arr.end());
+    const auto max_y = std::max_element(imgn_arr.begin(), imgn_arr.end());
+    if(!min_x || !min_y || !max_x || !max_y) {
+        return;
+    }
 
-void pixel_primitives::rotate(bitmap &dst_btmp, const bitmap &src_btmp, const std::complex<double> &rotor) {
-    for (int y = 0; y < src_btmp.height; ++y) {
-        for (int x = 0; x < src_btmp.width; ++x) {
-            const auto& src = pixel(dst_btmp, x, y);
-            const auto& rotated_position = rotor * std::complex<double>(x, y);
-            pixel(dst_btmp, rotated_position.real(), rotated_position.imag()) = src;
+    const std::uint32_t gp = 0x0;
+    const auto inv_rotor = (std::complex<double>(1, 0) / rotor);
+    for (std::int32_t y = *min_y; y < *max_y; ++y) {
+        for (std::int32_t x = *min_x; x < *max_x; ++x) {
+            const auto& rotated_position = inv_rotor * std::complex<double>(x, y);
+            const auto sx = rotated_position.real() / scaler + src_btmp.width / 2;
+            const auto sy = rotated_position.imag() / scaler + src_btmp.height / 2;
+
+            std::uint32_t src0 = pixel(src_btmp, sx,     sy,     gp);
+            std::uint32_t src1 = pixel(src_btmp, sx + 1, sy,     gp);
+            std::uint32_t src2 = pixel(src_btmp, sx    , sy + 1, gp);
+            std::uint32_t src3 = pixel(src_btmp, sx + 1, sy + 1, gp);
+
+            std::uint32_t result_src = aver_argb<4>({ src0, src1, src2, src3 });
+
+            auto& bottom = pixel(dst_btmp, x + center_x, y + center_x);
+
+            bottom = blend_argb(result_src, bottom) ;
+            //pixel(dst_btmp, x + center_x, y + center_x) = src4;
         }
     }
+
+    draw_circle(dst_btmp, center_x, center_x, 8, 0xff00ff00);
+
+    draw_circle(dst_btmp, lt.real() + center_x, lt.imag() + center_y, 4, 0xff00ff00);
+    draw_circle(dst_btmp, rt.real() + center_x, rt.imag() + center_y, 4, 0xff00ff00);
+    draw_circle(dst_btmp, lb.real() + center_x, lb.imag() + center_y, 4, 0xff00ff00);
+    draw_circle(dst_btmp, rb.real() + center_x, rb.imag() + center_y, 4, 0xff00ff00);
+
+
+    draw_rect(
+                dst_btmp,
+                *min_x + center_x,
+                *min_y + center_y,
+                *max_x + center_x,
+                *max_y + center_y,
+                0xff0000ff
+                );
 }
