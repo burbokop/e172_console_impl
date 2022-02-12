@@ -1,6 +1,7 @@
 #ifndef PIXELPRIMITIVES_H
 #define PIXELPRIMITIVES_H
 
+#include <complex>
 #include <cstdint>
 
 namespace pixel_primitives {
@@ -137,6 +138,8 @@ void blit(
 inline void blit(bitmap &dst_btmp, const bitmap &src_btmp, std::size_t offset_x, std::size_t offset_y) {
     blit(dst_btmp, src_btmp, offset_x, offset_y, src_btmp.width, src_btmp.height);
 }
+
+void rotate(bitmap &dst_btmp, const bitmap &src_btmp, const std::complex<double> &rotor);
 
 };
 

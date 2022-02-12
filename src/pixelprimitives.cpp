@@ -243,3 +243,13 @@ void pixel_primitives::blit(bitmap &dst_btmp, const bitmap &src_btmp, std::size_
     }
 }
 
+
+void pixel_primitives::rotate(bitmap &dst_btmp, const bitmap &src_btmp, const std::complex<double> &rotor) {
+    for (int y = 0; y < src_btmp.height; ++y) {
+        for (int x = 0; x < src_btmp.width; ++x) {
+            const auto& src = pixel(dst_btmp, x, y);
+            const auto& rotated_position = rotor * std::complex<double>(x, y);
+            pixel(dst_btmp, rotated_position.real(), rotated_position.imag()) = src;
+        }
+    }
+}
