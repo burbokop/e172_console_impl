@@ -1,9 +1,12 @@
 #include "colorizer.h"
 
+
+
+#if __has_include(<e172/src/math/math.h>)
+#include <e172/src/math/math.h>
+#else
 #include <e172/math/math.h>
-
-// "\033[38;2;255;100;0mTRUECOLOR\033[0m\n"
-
+#endif
 
 
 std::string ansi_colorizer::beginSeq(uint32_t argb) const {

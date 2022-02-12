@@ -8,10 +8,6 @@ bool ConsoleRenderer::update() {
     return true;
 }
 
-void ConsoleRenderer::setDepth(int64_t depth) {
-
-}
-
 void ConsoleRenderer::fill(uint32_t color) {
     pixel_primitives::fill_area(m_writer.bitmap(), 0, 0, m_writer.bitmap().width, m_writer.bitmap().height, color);
 }
@@ -39,6 +35,23 @@ void ConsoleRenderer::drawSquare(const e172::Vector &point, int radius, uint32_t
 void ConsoleRenderer::drawCircle(const e172::Vector &point, int radius, uint32_t color) {
     pixel_primitives::draw_circle(m_writer.bitmap(), point.x(), point.y(), radius, color);
 }
+
+void ConsoleRenderer::drawImage(const e172::Image &image, const e172::Vector &position, double angle, double zoom) {
+    if(imageProvider(image) == provider()) {
+        pixel_primitives::blit_transformed(
+                    m_writer.bitmap(),
+                    imageData<pixel_primitives::bitmap>(image),
+                    std::complex<double>(std::cos(angle), std::sin(angle)),
+                    zoom,
+                    position.x(),
+                    position.y()
+                    );
+    }
+}
+
+e172::Color *ConsoleRenderer::bitmap() const { return m_writer.bitmap().matrix; }
+
+void ConsoleRenderer::setFullscreen(bool value) { m_writer.set_auto_resize(value); }
 
 void ConsoleRenderer::setResolution(e172::Vector value) {
     m_writer.set_frame_size(value.x(), value.y());

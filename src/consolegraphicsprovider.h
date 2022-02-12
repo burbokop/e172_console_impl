@@ -1,7 +1,12 @@
 #ifndef CONSOLEGRAPHICSPROVIDER_H
 #define CONSOLEGRAPHICSPROVIDER_H
 
+#if __has_include(<e172/src/graphics/abstractgraphicsprovider.h>)
+#include <e172/src/graphics/abstractgraphicsprovider.h>
+#else
 #include <e172/graphics/abstractgraphicsprovider.h>
+#endif
+
 #include "consolerenderer.h"
 
 class ConsoleGraphicsProvider : public e172::AbstractGraphicsProvider {

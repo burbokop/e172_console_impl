@@ -19,9 +19,6 @@ inline pixel_primitives::bitmap sdl_surface_to_bitmap(SDL_Surface* surf) {
 int main() {
     //std::vector<pixel_primitives::bitmap> vvv;
 
-
-    //return 0;
-
     std::iostream null (0);
 
 
@@ -66,6 +63,7 @@ int main() {
 
     e172::ElapsedTimer frameChangeTimer(1000 / 4);
     std::size_t frame_index = 0;
+    double angle = 0;
 
     while (true) {
         if(updateTimer.check()) {
@@ -79,10 +77,16 @@ int main() {
 
             //pixel_primitives::draw_circle(s.bitmap(), s.bitmap().width / 2, s.bitmap().height / 2, 12, 0xff00ff00);
 
-            pixel_primitives::blit(s.bitmap(), decoder.frame(frame_index), 0, 0);
 
 
-            if(true && (s.bitmap().width != last_w || s.bitmap().height != last_h)) {
+            //pixel_primitives::rotate(s.bitmap(), decoder.frame(frame_index), std::complex<double>(std::cos(angle), std::sin(angle)));
+
+            //pixel_primitives::copy(s.bitmap(), decoder.frame(frame_index));
+
+            //pixel_primitives::blit(s.bitmap(), decoder.frame(frame_index), 0, 0);
+
+
+            if(false && (s.bitmap().width != last_w || s.bitmap().height != last_h)) {
                 SDL_FreeSurface(sdl_surface);
                 SDL_SetWindowSize(window, s.bitmap().width, s.bitmap().height);
                 sdl_surface = SDL_GetWindowSurface(window);
@@ -94,7 +98,19 @@ int main() {
             auto btmp = sdl_surface_to_bitmap(sdl_surface);
             pixel_primitives::copy(btmp, s.bitmap());
 
-            pixel_primitives::blit(btmp, decoder.frame(frame_index), 0, 0);
+            const auto frame = decoder.frame(frame_index);
+
+            pixel_primitives::blit_transformed(
+                        btmp,
+                        frame,
+                        std::complex<double>(std::cos(angle), std::sin(angle)),
+                        (std::sin(frame_index * 0.02) + 2) / 3.,
+                        100,
+                        100
+                        );
+            angle += 0.01;
+
+
 
             //if(frameChangeTimer.check()) {
             ++frame_index;
