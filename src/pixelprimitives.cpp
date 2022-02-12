@@ -184,26 +184,26 @@ void pixel_primitives::draw_grid(bitmap &btmp, std::size_t point0_x, std::size_t
 
 void pixel_primitives::copy_flipped(bitmap &dst_btmp, const bitmap &src_btmp, bool x_flip, bool y_flip) {
     if(x_flip && y_flip) {
-        for (int y = 0; y < src_btmp.height; ++y) {
-            for (int x = 0; x < src_btmp.width; ++x) {
+        for (std::size_t y = 0; y < src_btmp.height; ++y) {
+            for (std::size_t x = 0; x < src_btmp.width; ++x) {
                 pixel(dst_btmp, src_btmp.width - x, src_btmp.height - y) = pixel(src_btmp, x, y);
             }
         }
     } else if(x_flip) {
-        for (int y = 0; y < src_btmp.height; ++y) {
-            for (int x = 0; x < src_btmp.width; ++x) {
+        for (std::size_t y = 0; y < src_btmp.height; ++y) {
+            for (std::size_t x = 0; x < src_btmp.width; ++x) {
                 pixel(dst_btmp, src_btmp.width - x, y) = pixel(src_btmp, x, y);
             }
         }
     } else if(y_flip) {
-        for (int y = 0; y < src_btmp.height; ++y) {
-            for (int x = 0; x < src_btmp.width; ++x) {
+        for (std::size_t y = 0; y < src_btmp.height; ++y) {
+            for (std::size_t x = 0; x < src_btmp.width; ++x) {
                 pixel(dst_btmp, x, src_btmp.height - y) = pixel(src_btmp, x, y);
             }
         }
     } else {
-        for (int y = 0; y < src_btmp.height; ++y) {
-            for (int x = 0; x < src_btmp.width; ++x) {
+        for (std::size_t y = 0; y < src_btmp.height; ++y) {
+            for (std::size_t x = 0; x < src_btmp.width; ++x) {
                 pixel(dst_btmp, x, y) = pixel(src_btmp, x, y);
             }
         }
@@ -235,21 +235,11 @@ void pixel_primitives::blit(bitmap &dst_btmp, const bitmap &src_btmp, std::size_
     //w = std::min(w, dst_btmp.width);
     //h = std::min(h, dst_btmp.height);
 
-    for (int y = 0; y < h; ++y) {
-        for (int x = 0; x < w; ++x) {
+    for (std::size_t y = 0; y < h; ++y) {
+        for (std::size_t x = 0; x < w; ++x) {
             auto& bottom = pixel(dst_btmp, x + offset_x, y + offset_y);
             bottom = blend_argb(pixel(src_btmp, x, y), bottom);
         }
     }
 }
 
-
-void pixel_primitives::rotate(bitmap &dst_btmp, const bitmap &src_btmp, const std::complex<double> &rotor) {
-    for (int y = 0; y < src_btmp.height; ++y) {
-        for (int x = 0; x < src_btmp.width; ++x) {
-            const auto& src = pixel(dst_btmp, x, y);
-            const auto& rotated_position = rotor * std::complex<double>(x, y);
-            pixel(dst_btmp, rotated_position.real(), rotated_position.imag()) = src;
-        }
-    }
-}
