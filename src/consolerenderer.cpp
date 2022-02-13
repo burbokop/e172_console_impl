@@ -49,7 +49,9 @@ void ConsoleRenderer::drawImage(const e172::Image &image, const e172::Vector &po
     }
 }
 
-e172::Color *ConsoleRenderer::bitmap() const { return m_writer.bitmap().matrix; }
+void ConsoleRenderer::modify_bitmap(const std::function<void (e172::Color *)> &modifier) {
+    modifier(m_writer.bitmap().matrix);
+}
 
 void ConsoleRenderer::setFullscreen(bool value) { m_writer.set_auto_resize(value); }
 
