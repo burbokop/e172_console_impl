@@ -20,6 +20,7 @@ target_link_libraries(console_impl_example
     console_impl
     e172
     SDL2
+    ncurses
     avcodec
     avformat
     avfilter
