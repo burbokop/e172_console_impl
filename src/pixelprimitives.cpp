@@ -1,5 +1,6 @@
 #include "pixelprimitives.h"
 
+#include <algorithm>
 #include <math.h>
 
 void pixel_primitives::draw_line(bitmap &btmp, std::size_t point0_x, std::size_t point0_y, std::size_t point1_x, std::size_t point1_y, uint32_t argb) {
