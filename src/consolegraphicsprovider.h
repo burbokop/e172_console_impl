@@ -28,12 +28,31 @@ public:
     virtual bool fontLoaded(const std::string &name) const override { return false; }
 
 protected:
-    virtual void destructImage(e172::SharedContainer::data_ptr ptr) const override;
-    virtual e172::SharedContainer::ptr imageBitMap(e172::SharedContainer::data_ptr ptr) const override;
-    virtual bool saveImage(e172::SharedContainer::data_ptr, const std::string &) const override { return false; }
-    virtual e172::SharedContainer::data_ptr imageFragment(e172::SharedContainer::data_ptr ptr, int x, int y, int &w, int &h) const override;
-    virtual e172::SharedContainer::data_ptr blitImages(e172::SharedContainer::data_ptr ptr0, e172::SharedContainer::data_ptr ptr1, int x, int y, int &w, int &h) const override;
-    virtual e172::SharedContainer::data_ptr transformImage(e172::SharedContainer::data_ptr ptr, uint64_t) const override { return ptr; }
+    virtual void destructImage(e172::SharedContainer::DataPtr ptr) const override;
+    virtual e172::SharedContainer::Ptr imageBitMap(e172::SharedContainer::DataPtr ptr) const override;
+    virtual bool saveImage(e172::SharedContainer::DataPtr, const std::string &) const override
+    {
+        return false;
+    }
+
+    virtual e172::SharedContainer::DataPtr imageFragment(e172::SharedContainer::DataPtr ptr,
+                                                         std::size_t x,
+                                                         std::size_t y,
+                                                         std::size_t &w,
+                                                         std::size_t &h) const override;
+
+    virtual e172::SharedContainer::DataPtr blitImages(e172::SharedContainer::DataPtr ptr0,
+                                                      e172::SharedContainer::DataPtr ptr1,
+                                                      int x,
+                                                      int y,
+                                                      std::size_t &w,
+                                                      std::size_t &h) const override;
+
+    virtual e172::SharedContainer::DataPtr transformImage(e172::SharedContainer::DataPtr ptr,
+                                                          std::uint64_t) const override
+    {
+        return ptr;
+    }
 };
 
 #endif // CONSOLEGRAPHICSPROVIDER_H
