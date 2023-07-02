@@ -1,22 +1,26 @@
-#ifndef MP4_DECODER_H
-#define MP4_DECODER_H
+#pragma once
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 #include <libavcodec/avcodec.h>
+#include <libavdevice/avdevice.h>
+#include <libavfilter/avfilter.h>
 #include <libavformat/avformat.h>
-#include <libswscale/swscale.h>
-#include <libavutil/pixfmt.h>
+#include <libavutil/avutil.h>
 #include <libavutil/imgutils.h>
+#include <libavutil/pixfmt.h>
+#include <libswscale/swscale.h>
 #ifdef __cplusplus
 }
 #endif
 
+#include "../../src/pixelprimitives.h"
+#include <cstdint>
 #include <ostream>
 #include <vector>
-#include "pixelprimitives.h"
-#include <cstdint>
+
+namespace e172::impl::console::video_player {
 
 class mp4_decoder {
     const char *m_path;
@@ -58,4 +62,4 @@ public:
     ~mp4_decoder();
 };
 
-#endif // MP4_DECODER_H
+} // namespace e172::impl::console::video_player

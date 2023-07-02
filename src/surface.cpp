@@ -1,8 +1,8 @@
 #include "surface.h"
+
 #include <sys/ioctl.h>
 #include <unistd.h>
 #include <ostream>
-
 #include <cstdio>
 #include <fstream>
 #include <cerrno>
@@ -10,45 +10,62 @@
 #include <ext/stdio_filebuf.h>
 #include <ext/stdio_sync_filebuf.h>
 
-bool console_writer::auto_resize() const {
+namespace e172::impl::console {
+
+bool Writer::auto_resize() const
+{
     return m_auto_resize;
 }
 
-void console_writer::set_auto_resize(bool newAuto_resize) {
+void Writer::set_auto_resize(bool newAuto_resize)
+{
     m_auto_resize = newAuto_resize;
 }
 
-std::ostream &console_writer::output() const {
+std::ostream &Writer::output() const
+{
     return m_output;
 }
 
-double console_writer::symbol_wh_fraction() const {
+double Writer::symbol_wh_fraction() const
+{
     return m_symbol_wh_fraction;
 }
 
-console_writer::console_writer(std::ostream &output, const colorizer *colorizer, const std::string &gradient, double contrast, bool auto_resize, uint32_t mask, bool ignore_alpha, double symbol_wh_fraction)
-    : m_output(output),
-      m_colorizer(colorizer),
-      m_gradient(gradient),
-      m_contrast(contrast),
-      m_auto_resize(auto_resize),
-      m_mask(mask),
-      m_ignore_alpha(ignore_alpha),
-      m_symbol_wh_fraction(symbol_wh_fraction) {}
+Writer::Writer(std::ostream &output,
+               const Colorizer *colorizer,
+               const std::string &gradient,
+               double contrast,
+               bool auto_resize,
+               uint32_t mask,
+               bool ignore_alpha,
+               double symbol_wh_fraction)
+    : m_output(output)
+    , m_colorizer(colorizer)
+    , m_gradient(gradient)
+    , m_contrast(contrast)
+    , m_auto_resize(auto_resize)
+    , m_mask(mask)
+    , m_ignore_alpha(ignore_alpha)
+    , m_symbol_wh_fraction(symbol_wh_fraction)
+{}
 
-
-char console_writer::charFromArgb(uint32_t argb) const {
+char Writer::charFromArgb(uint32_t argb) const
+{
     return charFromBrightness((std::uint8_t(argb) + std::uint8_t(argb >> 8) + std::uint8_t(argb >> 16)) * std::uint8_t(argb >> 24) / 3 / 0xff);
 }
 
-char console_writer::charFromBrightness(uint8_t brightness) const {
+char Writer::charFromBrightness(uint8_t brightness) const
+{
     if(std::abs(m_contrast - 1) >= std::numeric_limits<double>::epsilon()) {
         brightness = (brightness - 0x88) * m_contrast + 0x88;
     }
     return m_gradient[brightness * (m_gradient.size() - 1) / 0xff];
 }
 
-std::pair<std::size_t, std::size_t> console_writer::output_stream_size(const std::ostream &stream, double wh_fraction) {
+std::pair<std::size_t, std::size_t> Writer::output_stream_size(const std::ostream &stream,
+                                                               double wh_fraction)
+{
     if(const auto& fd = output_stream_descriptor(stream)) {
         int cols = 80;
         int lines = 24;
@@ -73,7 +90,8 @@ std::pair<std::size_t, std::size_t> console_writer::output_stream_size(const std
     return { 0, 0 };
 }
 
-std::optional<int> console_writer::output_stream_descriptor(const std::ostream &stream) {
+std::optional<int> Writer::output_stream_descriptor(const std::ostream &stream)
+{
     const auto& stdio_buf = dynamic_cast<__gnu_cxx::stdio_filebuf<char>*>(stream.rdbuf());
     if(stdio_buf) {
         return stdio_buf->fd();
@@ -92,7 +110,8 @@ std::optional<int> console_writer::output_stream_descriptor(const std::ostream &
     return std::nullopt;
 }
 
-void console_writer::set_frame_size(std::size_t w, std::size_t h) {
+void Writer::set_frame_size(std::size_t w, std::size_t h)
+{
     if(w != m_bitmap.width || h != m_bitmap.height) {
         if(w != 0 && h != 0) {
             if(m_bitmap) {
@@ -103,13 +122,14 @@ void console_writer::set_frame_size(std::size_t w, std::size_t h) {
     }
 }
 
-std::size_t console_writer::write_frame() {
+std::size_t Writer::write_frame()
+{
     std::size_t result = 0;
     if(m_bitmap && m_bitmap.width > 0 && m_bitmap.height > 0) {
         const auto w = m_bitmap.width / m_symbol_wh_fraction;
         const auto h = m_bitmap.height;
 
-        std::string buffer; { buffer.reserve(); }
+        std::string buffer; //{ buffer.reserve(); }
         std::string lastColorCode;
         for(std::size_t y = 0; y < h; ++y) {
             for(std::size_t x = 0; x < w; ++x) {
@@ -143,8 +163,11 @@ std::size_t console_writer::write_frame() {
     return result;
 }
 
-console_writer::~console_writer() {
+Writer::~Writer()
+{
     if(m_bitmap) {
         delete m_bitmap.matrix;
     }
 }
+
+} // namespace e172::impl::console

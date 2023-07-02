@@ -1,23 +1,21 @@
-#ifndef CONSOLERENDERER_H
-#define CONSOLERENDERER_H
+#pragma once
 
 #include "surface.h"
-
-#if __has_include(<e172/src/graphics/abstractrenderer.h>)
-#include <e172/src/graphics/abstractrenderer.h>
-#else
 #include <e172/graphics/abstractrenderer.h>
-#endif
 
 namespace e172 {
-    class Variant;
-    typedef std::vector<e172::Variant> VariantVector;
-}
+class Variant;
+using VariantVector = std::vector<e172::Variant>;
+} // namespace e172
 
-class ConsoleRenderer : public e172::AbstractRenderer {
-    console_writer m_writer;
+namespace e172::impl::console {
+
+class Renderer : public e172::AbstractRenderer
+{
+    Writer m_writer;
+
 public:
-    ConsoleRenderer(std::ostream &output);
+    Renderer(std::ostream &output);
 
     // AbstractRenderer interface
 protected:
@@ -80,4 +78,4 @@ public:
     virtual e172::Vector<double> screenSize() const override;
 };
 
-#endif // CONSOLERENDERER_H
+} // namespace e172::impl::console

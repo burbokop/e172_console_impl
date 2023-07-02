@@ -1,12 +1,11 @@
-#ifndef PIXELPRIMITIVES_H
-#define PIXELPRIMITIVES_H
+#pragma once
 
 #include <array>
 #include <complex>
 #include <cstdint>
 #include <type_traits>
 
-namespace pixel_primitives {
+namespace e172::impl::console::pixel_primitives {
 
 struct bitmap {
     std::uint32_t *matrix = nullptr;
@@ -192,6 +191,4 @@ inline void blit_rotated(
         const std::complex<double> &rotor
         ) { blit_rotated(dst_btmp, src_btmp, rotor, src_btmp.width / 2, src_btmp.height / 2); }
 
-};
-
-#endif // PIXELPRIMITIVES_H
+}; // namespace e172::impl::console::pixel_primitives

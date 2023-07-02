@@ -1,19 +1,22 @@
-#ifndef PNG_READER_H
-#define PNG_READER_H
+#pragma once
 
 #include <istream>
-
 #include "pixelprimitives.h"
 
-struct png_reader {
-    class png_decoding_exception : public std::exception {
-        const char* m_what;
-    public:
-        png_decoding_exception(const char* what) : m_what(what) {}
-        const char *what() const noexcept { return m_what; }
-    };
+namespace e172::impl::console::png {
 
-    static pixel_primitives::bitmap read(std::istream &stream);
+class PNGDecodingException : public std::exception
+{
+public:
+    PNGDecodingException(const char *what)
+        : m_what(what)
+    {}
+    const char *what() const noexcept { return m_what; }
+
+private:
+    const char *m_what;
 };
 
-#endif // PNG_READER_H
+pixel_primitives::bitmap read(std::istream &stream);
+
+} // namespace e172::impl::console::png

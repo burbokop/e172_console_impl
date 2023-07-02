@@ -1,31 +1,39 @@
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.26.3)
 
-project(console_impl LANGUAGES CXX)
+project(e172_console_impl LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-include(console_impl.cmake)
+option(ENABLE_EXAMPLES "Enable examples" ON)
 
-add_executable(console_impl_example
-    ${CMAKE_CURRENT_LIST_DIR}/src/main.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/src/painter.h
-    ${CMAKE_CURRENT_LIST_DIR}/src/painter.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/src/mp4_decoder.h
-    ${CMAKE_CURRENT_LIST_DIR}/src/mp4_decoder.cpp
-    )
+find_program(CCACHE_PROGRAM ccache)
+if(CCACHE_PROGRAM)
+    set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE "${CCACHE_PROGRAM}")
+endif()
 
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-target_link_libraries(console_impl_example
-    console_impl
+add_library(e172_console_impl SHARED
+    ${CMAKE_CURRENT_LIST_DIR}/src/renderer.h
+    ${CMAKE_CURRENT_LIST_DIR}/src/renderer.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/src/graphicsprovider.h
+    ${CMAKE_CURRENT_LIST_DIR}/src/graphicsprovider.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/src/colorizer/colorizer.h
+    ${CMAKE_CURRENT_LIST_DIR}/src/colorizer/colorizer.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/src/surface.h
+    ${CMAKE_CURRENT_LIST_DIR}/src/surface.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/src/pixelprimitives.h
+    ${CMAKE_CURRENT_LIST_DIR}/src/pixelprimitives.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/src/png_reader.h
+    ${CMAKE_CURRENT_LIST_DIR}/src/png_reader.cpp)
+
+find_package(PNG REQUIRED)
+target_link_libraries(e172_console_impl
     e172
-    SDL2
-    ncurses
-    avcodec
-    avformat
-    avfilter
-    avdevice
-    swresample
-    swscale
-    avutil
-    )
+    ${PNG_LIBRARY})
+
+if(ENABLE_EXAMPLES)
+    add_subdirectory(examples)
+endif()

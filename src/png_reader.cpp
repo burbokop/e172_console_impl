@@ -3,8 +3,10 @@
 #include <png.h>
 #include <bsd/stdio.h>
 
+namespace e172::impl::console::png {
 
-pixel_primitives::bitmap png_reader::read(std::istream &stream) {
+pixel_primitives::bitmap read(std::istream &stream)
+{
     auto fp = fropen(
                 &stream,
                 []/* readfn  */(void *c, char * buf, int siz) -> int {
@@ -13,23 +15,27 @@ pixel_primitives::bitmap png_reader::read(std::istream &stream) {
                 }
                 );
 
-    std::uint8_t header[8];    // 8 is the maximum size that can be checked
+    std::uint8_t header[8]; // 8 is the maximum size that can be checked
 
-
-    if (!fp) throw png_decoding_exception("stream could not be opened for reading");
+    if (!fp)
+        throw PNGDecodingException("stream could not be opened for reading");
 
     fread(header, 1, 8, fp);
-    if (png_sig_cmp(header, 0, 8)) throw png_decoding_exception("decoding png failed. stream data is not recognized as a PNG");
+    if (png_sig_cmp(header, 0, 8))
+        throw PNGDecodingException("decoding png failed. stream data is not recognized as a PNG");
 
     /* initialize stuff */
     const auto png_ptr = png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
 
-    if (!png_ptr) throw png_decoding_exception("decoding png failed. png_create_read_struct failed");
+    if (!png_ptr)
+        throw PNGDecodingException("decoding png failed. png_create_read_struct failed");
 
     const auto info_ptr = png_create_info_struct(png_ptr);
-    if (!info_ptr) throw png_decoding_exception("decoding png failed. png_create_info_struct failed");
+    if (!info_ptr)
+        throw PNGDecodingException("decoding png failed. png_create_info_struct failed");
 
-    if (setjmp(png_jmpbuf(png_ptr))) throw png_decoding_exception("decoding png failed. error during init_io");
+    if (setjmp(png_jmpbuf(png_ptr)))
+        throw PNGDecodingException("decoding png failed. error during init_io");
 
     png_init_io(png_ptr, fp);
     png_set_sig_bytes(png_ptr, 8);
@@ -45,7 +51,8 @@ pixel_primitives::bitmap png_reader::read(std::istream &stream) {
     png_read_update_info(png_ptr, info_ptr);
 
     /* read file */
-    if (setjmp(png_jmpbuf(png_ptr))) throw png_decoding_exception("decoding png failed. error during read_image");
+    if (setjmp(png_jmpbuf(png_ptr)))
+        throw PNGDecodingException("decoding png failed. error during read_image");
 
     const auto row_pointers = (png_bytep*) malloc(sizeof(png_bytep) * height);
     for (std::size_t y = 0; y < height; y++)
@@ -68,3 +75,4 @@ pixel_primitives::bitmap png_reader::read(std::istream &stream) {
     return result;
 }
 
+} // namespace e172::impl::console::png

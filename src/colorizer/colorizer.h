@@ -1,17 +1,20 @@
-#ifndef COLOR_H
-#define COLOR_H
+#pragma once
 
 #include <cstdint>
 #include <string>
 
-class colorizer {
+namespace e172::impl::console {
+
+class Colorizer
+{
 public:
     virtual std::string beginSeq(std::uint32_t argb) const = 0;
     virtual std::string endSeq() const = 0;
-    virtual ~colorizer() {}
+    virtual ~Colorizer() {}
 };
 
-class ansi_colorizer : public colorizer {
+class AnsiColorizer : public Colorizer
+{
 public:
 
     struct color_mapping {
@@ -67,7 +70,8 @@ public:
     virtual std::string endSeq() const override;
 };
 
-class ansi_true_colorizer : public colorizer {
+class ansi_true_colorizer : public Colorizer
+{
     std::uint8_t m_deterioration;
 public:
     static inline const char* reset = "\033[0m";
@@ -80,4 +84,4 @@ public:
     virtual std::string endSeq() const override;
 };
 
-#endif // COLOR_H
+} // namespace e172::impl::console

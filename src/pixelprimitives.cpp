@@ -3,7 +3,15 @@
 #include <algorithm>
 #include <math.h>
 
-void pixel_primitives::draw_line(bitmap &btmp, std::size_t point0_x, std::size_t point0_y, std::size_t point1_x, std::size_t point1_y, uint32_t argb) {
+namespace e172::impl::console::pixel_primitives {
+
+void draw_line(bitmap &btmp,
+               std::size_t point0_x,
+               std::size_t point0_y,
+               std::size_t point1_x,
+               std::size_t point1_y,
+               uint32_t argb)
+{
     std::int64_t d, dL, dU, dx, dy, temp;
     dy = point1_y - point0_y;
     if (dy < 0) {
@@ -75,7 +83,9 @@ void pixel_primitives::draw_line(bitmap &btmp, std::size_t point0_x, std::size_t
     }
 }
 
-void pixel_primitives::draw_square(bitmap &btmp, std::size_t point_x, std::size_t point_y, std::size_t radius, uint32_t argb) {
+void draw_square(
+    bitmap &btmp, std::size_t point_x, std::size_t point_y, std::size_t radius, uint32_t argb)
+{
     const std::size_t len = radius * 2;
     for(std::size_t i = 0; i < len; i++) {
         pixel(btmp, point_x + i, point_y) = argb;
@@ -86,7 +96,9 @@ void pixel_primitives::draw_square(bitmap &btmp, std::size_t point_x, std::size_
     pixel(btmp, point_x + len, point_y + len) = argb;
 }
 
-void pixel_primitives::fill_square(bitmap &btmp, std::size_t point_x, std::size_t point_y, std::size_t len, uint32_t argb) {
+void fill_square(
+    bitmap &btmp, std::size_t point_x, std::size_t point_y, std::size_t len, uint32_t argb)
+{
     for (std::size_t i = 0; i < len; i++) {
         for (std::size_t j = 0; j < len; j++) {
             pixel(btmp, point_x + j, point_y + i) = argb;
@@ -94,7 +106,13 @@ void pixel_primitives::fill_square(bitmap &btmp, std::size_t point_x, std::size_
     }
 }
 
-void pixel_primitives::draw_rect(bitmap &btmp, std::size_t point0_x, std::size_t point0_y, std::size_t point1_x, std::size_t point1_y, uint32_t argb) {
+void draw_rect(bitmap &btmp,
+               std::size_t point0_x,
+               std::size_t point0_y,
+               std::size_t point1_x,
+               std::size_t point1_y,
+               uint32_t argb)
+{
     const auto& min_x = std::min(point1_x, point0_x);
     const auto& max_x = std::max(point1_x, point0_x);
     const auto& min_y = std::min(point1_y, point0_y);
@@ -126,7 +144,13 @@ void pixel_primitives::draw_rect(bitmap &btmp, std::size_t point0_x, std::size_t
     }
 }
 
-void pixel_primitives::fill_area(bitmap &btmp, std::size_t point0_x, std::size_t point0_y, std::size_t point1_x, std::size_t point1_y, uint32_t argb) {
+void fill_area(bitmap &btmp,
+               std::size_t point0_x,
+               std::size_t point0_y,
+               std::size_t point1_x,
+               std::size_t point1_y,
+               uint32_t argb)
+{
     std::int64_t dx = point1_x - point0_x, dy = point1_y - point0_y;
     if (dx >= 0) {
         if (dy >= 0) {
@@ -159,7 +183,9 @@ void pixel_primitives::fill_area(bitmap &btmp, std::size_t point0_x, std::size_t
     }
 }
 
-void pixel_primitives::draw_circle(bitmap &btmp, std::size_t center_x, std::size_t center_y, std::size_t radius, uint32_t argb) {
+void draw_circle(
+    bitmap &btmp, std::size_t center_x, std::size_t center_y, std::size_t radius, uint32_t argb)
+{
     std::int64_t i2 = std::numeric_limits<std::int64_t>::max();
     for(std::int64_t i = 0; i + 1 < i2; i++) {
         i2 = static_cast<std::int64_t>(std::sqrt(radius * radius - i * i));
@@ -175,7 +201,14 @@ void pixel_primitives::draw_circle(bitmap &btmp, std::size_t center_x, std::size
     }
 }
 
-void pixel_primitives::draw_grid(bitmap &btmp, std::size_t point0_x, std::size_t point0_y, std::size_t point1_x, std::size_t point1_y, std::size_t interval, uint32_t argb) {
+void draw_grid(bitmap &btmp,
+               std::size_t point0_x,
+               std::size_t point0_y,
+               std::size_t point1_x,
+               std::size_t point1_y,
+               std::size_t interval,
+               uint32_t argb)
+{
     for (std::int64_t i = 0; i < (point1_x - point0_x) / interval; i++) {
         for (std::int64_t j = 0; j < point1_y - point0_y; j++) {
             pixel(btmp, point0_x + (i * interval), point0_y + j) = argb;
@@ -188,7 +221,8 @@ void pixel_primitives::draw_grid(bitmap &btmp, std::size_t point0_x, std::size_t
     }
 }
 
-void pixel_primitives::copy_flipped(bitmap &dst_btmp, const bitmap &src_btmp, bool x_flip, bool y_flip) {
+void copy_flipped(bitmap &dst_btmp, const bitmap &src_btmp, bool x_flip, bool y_flip)
+{
     if(x_flip && y_flip) {
         for (std::size_t y = 0; y < src_btmp.height; ++y) {
             for (std::size_t x = 0; x < src_btmp.width; ++x) {
@@ -216,7 +250,8 @@ void pixel_primitives::copy_flipped(bitmap &dst_btmp, const bitmap &src_btmp, bo
     }
 }
 
-std::uint32_t pixel_primitives::blend_argb(std::uint32_t top, std::uint32_t bottom) {
+std::uint32_t blend_argb(std::uint32_t top, std::uint32_t bottom)
+{
     const auto ba = uint8_t((top >>  0) & 0x000000ff);
     const auto ga = uint8_t((top >>  8) & 0x000000ff);
     const auto ra = uint8_t((top >> 16) & 0x000000ff);
@@ -235,7 +270,13 @@ std::uint32_t pixel_primitives::blend_argb(std::uint32_t top, std::uint32_t bott
     return a_out | r_out | g_out | b_out;
 }
 
-void pixel_primitives::blit(bitmap &dst_btmp, const bitmap &src_btmp, std::size_t offset_x, std::size_t offset_y, std::size_t w, std::size_t h) {
+void blit(bitmap &dst_btmp,
+          const bitmap &src_btmp,
+          std::size_t offset_x,
+          std::size_t offset_y,
+          std::size_t w,
+          std::size_t h)
+{
     //w = std::min(w, src_btmp.width);
     //h = std::min(h, src_btmp.height);
     //w = std::min(w, dst_btmp.width);
@@ -249,14 +290,13 @@ void pixel_primitives::blit(bitmap &dst_btmp, const bitmap &src_btmp, std::size_
     }
 }
 
-void pixel_primitives::blit_transformed(
-        bitmap &dst_btmp,
-        const bitmap &src_btmp,
-        const std::complex<double> &rotor,
-        const double scaler,
-        std::size_t center_x,
-        std::size_t center_y
-        ) {
+void blit_transformed(bitmap &dst_btmp,
+                      const bitmap &src_btmp,
+                      const std::complex<double> &rotor,
+                      const double scaler,
+                      std::size_t center_x,
+                      std::size_t center_y)
+{
     const auto& lt = rotor * std::complex<double>(-double(src_btmp.width) / 2 * scaler, -double(src_btmp.height) / 2 * scaler);
     const auto& rt = rotor * std::complex<double>( double(src_btmp.width) / 2 * scaler, -double(src_btmp.height) / 2 * scaler);
     const auto& lb = rotor * std::complex<double>(-double(src_btmp.width) / 2 * scaler,  double(src_btmp.height) / 2 * scaler);
@@ -310,3 +350,5 @@ void pixel_primitives::blit_transformed(
                 0xff0000ff
                 );
 }
+
+} // namespace e172::impl::console::pixel_primitives

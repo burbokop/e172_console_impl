@@ -1,5 +1,7 @@
 #include "painter.h"
 
+namespace e172::impl::console::video_player {
+
 painter::painter() {}
 
 void painter::paint(pixel_primitives::bitmap &btmp) {
@@ -28,3 +30,5 @@ void painter::paint(pixel_primitives::bitmap &btmp) {
         }
     }
 }
+
+} // namespace e172::impl::console::video_player

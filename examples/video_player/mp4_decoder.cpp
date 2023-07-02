@@ -1,5 +1,6 @@
 #include "mp4_decoder.h"
 
+namespace e172::impl::console::video_player {
 
 mp4_decoder::mp4_decoder(const char *path,
         std::ostream &log,
@@ -58,7 +59,7 @@ mp4_decoder::mp4_decoder(const char *path,
     // the component that knows how to enCOde and DECode the stream
     // it's the codec (audio or video)
     // http://ffmpeg.org/doxygen/trunk/structAVCodec.html
-    AVCodec *pCodec = NULL;
+    const AVCodec *pCodec = NULL;
     // this component describes the properties of a codec used by the stream i
     // https://ffmpeg.org/doxygen/trunk/structAVCodecParameters.html
     AVCodecParameters *pCodecParameters =  NULL;
@@ -75,11 +76,11 @@ mp4_decoder::mp4_decoder(const char *path,
 
         log << "finding the proper decoder (CODEC)" << std::endl;
 
-        AVCodec *pLocalCodec = NULL;
+        const AVCodec *pLocalCodec = NULL;
 
         // finds the registered decoder for a codec ID
         // https://ffmpeg.org/doxygen/trunk/group__lavc__decoding.html#ga19a0ca553277f019dd5b0fec6e1f9dca
-        pLocalCodec = avcodec_find_decoder(pLocalCodecParameters->codec_id);
+        pLocalCodec = ::avcodec_find_decoder(pLocalCodecParameters->codec_id);
 
         if (pLocalCodec==NULL) {
             log << "ERROR unsupported codec!" << std::endl;
@@ -318,3 +319,5 @@ mp4_decoder::~mp4_decoder() {
     if(m_codecContext) { avcodec_free_context(&m_codecContext); }
     if(m_imageConvertContext) { sws_freeContext(m_imageConvertContext); }
 }
+
+} // namespace e172::impl::console::video_player

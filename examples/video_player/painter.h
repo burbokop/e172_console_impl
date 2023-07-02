@@ -1,10 +1,10 @@
-#ifndef PAINTER_H
-#define PAINTER_H
+#pragma once
 
+#include "../../src/surface.h"
 #include <e172/math/vector.h>
 #include <e172/time/elapsedtimer.h>
 
-#include "surface.h"
+namespace e172::impl::console::video_player {
 
 class painter {
     e172::ElapsedTimer m_timer;
@@ -14,4 +14,4 @@ public:
     void paint(pixel_primitives::bitmap& btmp);
 };
 
-#endif // PAINTER_H
+} // namespace e172::impl::console::video_player

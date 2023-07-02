@@ -1,15 +1,11 @@
 #include "colorizer.h"
 
-
-
-#if __has_include(<e172/src/math/math.h>)
-#include <e172/src/math/math.h>
-#else
 #include <e172/math/math.h>
-#endif
 
+namespace e172::impl::console {
 
-std::string ansi_colorizer::beginSeq(uint32_t argb) const {
+std::string AnsiColorizer::beginSeq(uint32_t argb) const
+{
     const auto& r = std::uint8_t(argb >> 16);
     const auto& g = std::uint8_t(argb >> 8);
     const auto& b = std::uint8_t(argb);
@@ -38,8 +34,9 @@ std::string ansi_colorizer::beginSeq(uint32_t argb) const {
     return code;
 }
 
-std::string ansi_colorizer::endSeq() const {
-    return ansi_colorizer::reset;
+std::string AnsiColorizer::endSeq() const
+{
+    return AnsiColorizer::reset;
 }
 
 ansi_true_colorizer::ansi_true_colorizer(uint8_t deterioration)
@@ -61,3 +58,4 @@ std::string ansi_true_colorizer::endSeq() const {
     return ansi_true_colorizer::reset;
 }
 
+} // namespace e172::impl::console

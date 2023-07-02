@@ -1,36 +1,45 @@
-#include "consolegraphicsprovider.h"
+#include "graphicsprovider.h"
+
 #include <fstream>
 #include "png_reader.h"
 
-e172::Image ConsoleGraphicsProvider::imageFromBitmap(const pixel_primitives::bitmap &btmp) const {
+namespace e172::impl::console {
+
+e172::Image GraphicsProvider::imageFromBitmap(const pixel_primitives::bitmap &btmp) const
+{
     return imageFromData(new e172::Image::Handle<pixel_primitives::bitmap>(btmp),
                          btmp.width,
                          btmp.height);
 }
 
-ConsoleGraphicsProvider::ConsoleGraphicsProvider(const std::vector<std::string> &args, std::ostream &output)
-    : e172::AbstractGraphicsProvider(args),
-      m_output(output) {}
+GraphicsProvider::GraphicsProvider(const std::vector<std::string> &args, std::ostream &output)
+    : e172::AbstractGraphicsProvider(args)
+    , m_output(output)
+{}
 
-e172::AbstractRenderer *ConsoleGraphicsProvider::renderer() const {
+e172::AbstractRenderer *GraphicsProvider::renderer() const
+{
     if(!m_renderer) {
-        m_renderer = new ConsoleRenderer(m_output);
+        m_renderer = new Renderer(m_output);
     }
     return m_renderer;
 }
 
-bool ConsoleGraphicsProvider::isValid() const {
+bool GraphicsProvider::isValid() const
+{
     return m_output.rdbuf();
 }
 
-e172::Image ConsoleGraphicsProvider::loadImage(const std::string &path) const {
+e172::Image GraphicsProvider::loadImage(const std::string &path) const
+{
     std::ifstream ifile(path, std::ios::in);
-    const auto& btmp = png_reader::read(ifile);
+    const auto &btmp = png::read(ifile);
     ifile.close();
     return imageFromBitmap(btmp);
 }
 
-e172::Image ConsoleGraphicsProvider::createImage(int width, int height) const {
+e172::Image GraphicsProvider::createImage(int width, int height) const
+{
     return imageFromBitmap(pixel_primitives::bitmap {
                                new std::uint32_t[width * height],
                                std::size_t(width),
@@ -38,7 +47,10 @@ e172::Image ConsoleGraphicsProvider::createImage(int width, int height) const {
                            });
 }
 
-e172::Image ConsoleGraphicsProvider::createImage(int width, int height, const ImageInitFunction &imageInitFunction) const {
+e172::Image GraphicsProvider::createImage(int width,
+                                          int height,
+                                          const ImageInitFunction &imageInitFunction) const
+{
     if(imageInitFunction) {
         pixel_primitives::bitmap btmp { new std::uint32_t[width * height], std::size_t(width), std::size_t(height) };
         imageInitFunction(btmp.matrix);
@@ -47,7 +59,10 @@ e172::Image ConsoleGraphicsProvider::createImage(int width, int height, const Im
     return e172::Image();
 }
 
-e172::Image ConsoleGraphicsProvider::createImage(int width, int height, const ImageInitFunctionExt &imageInitFunction) const {
+e172::Image GraphicsProvider::createImage(int width,
+                                          int height,
+                                          const ImageInitFunctionExt &imageInitFunction) const
+{
     if(imageInitFunction) {
         pixel_primitives::bitmap btmp { new std::uint32_t[width * height], std::size_t(width), std::size_t(height) };
         imageInitFunction(width, height, btmp.matrix);
@@ -56,7 +71,7 @@ e172::Image ConsoleGraphicsProvider::createImage(int width, int height, const Im
     return e172::Image();
 }
 
-void ConsoleGraphicsProvider::destructImage(e172::SharedContainer::DataPtr ptr) const
+void GraphicsProvider::destructImage(e172::SharedContainer::DataPtr ptr) const
 {
     const auto &handle = e172::Image::castHandle<pixel_primitives::bitmap>(ptr);
     const auto& siz = handle->c.width * handle->c.height;
@@ -64,18 +79,16 @@ void ConsoleGraphicsProvider::destructImage(e172::SharedContainer::DataPtr ptr) 
     delete handle;
 }
 
-e172::SharedContainer::Ptr ConsoleGraphicsProvider::imageBitMap(
-    e172::SharedContainer::DataPtr ptr) const
+e172::SharedContainer::Ptr GraphicsProvider::imageBitMap(e172::SharedContainer::DataPtr ptr) const
 {
     return e172::Image::castHandle<pixel_primitives::bitmap>(ptr)->c.matrix;
 }
 
-e172::SharedContainer::DataPtr ConsoleGraphicsProvider::imageFragment(
-    e172::SharedContainer::DataPtr ptr,
-    std::size_t x,
-    std::size_t y,
-    std::size_t &w,
-    std::size_t &h) const
+e172::SharedContainer::DataPtr GraphicsProvider::imageFragment(e172::SharedContainer::DataPtr ptr,
+                                                               std::size_t x,
+                                                               std::size_t y,
+                                                               std::size_t &w,
+                                                               std::size_t &h) const
 {
     const auto &btmp = e172::Image::castHandle<pixel_primitives::bitmap>(ptr)->c;
     pixel_primitives::bitmap result { new std::uint32_t[w * h], std::size_t(w), std::size_t(h) };
@@ -83,13 +96,12 @@ e172::SharedContainer::DataPtr ConsoleGraphicsProvider::imageFragment(
     return new e172::Image::Handle<pixel_primitives::bitmap>(result);
 }
 
-e172::SharedContainer::DataPtr ConsoleGraphicsProvider::blitImages(
-    e172::SharedContainer::DataPtr ptr0,
-    e172::SharedContainer::DataPtr ptr1,
-    int x,
-    int y,
-    std::size_t &w,
-    std::size_t &h) const
+e172::SharedContainer::DataPtr GraphicsProvider::blitImages(e172::SharedContainer::DataPtr ptr0,
+                                                            e172::SharedContainer::DataPtr ptr1,
+                                                            int x,
+                                                            int y,
+                                                            std::size_t &w,
+                                                            std::size_t &h) const
 {
     const auto &btmp0 = e172::Image::castHandle<pixel_primitives::bitmap>(ptr0)->c;
     const auto &btmp1 = e172::Image::castHandle<pixel_primitives::bitmap>(ptr1)->c;
@@ -98,3 +110,5 @@ e172::SharedContainer::DataPtr ConsoleGraphicsProvider::blitImages(
     pixel_primitives::blit(result, btmp1, x, y, w, h);
     return new e172::Image::Handle<pixel_primitives::bitmap>(result);
 }
+
+} // namespace e172::impl::console

@@ -1,20 +1,17 @@
-#ifndef CONSOLEGRAPHICSPROVIDER_H
-#define CONSOLEGRAPHICSPROVIDER_H
+#pragma once
 
-#if __has_include(<e172/src/graphics/abstractgraphicsprovider.h>)
-#include <e172/src/graphics/abstractgraphicsprovider.h>
-#else
+#include "renderer.h"
 #include <e172/graphics/abstractgraphicsprovider.h>
-#endif
 
-#include "consolerenderer.h"
+namespace e172::impl::console {
 
-class ConsoleGraphicsProvider : public e172::AbstractGraphicsProvider {
+class GraphicsProvider : public e172::AbstractGraphicsProvider
+{
     std::ostream& m_output;
-    mutable ConsoleRenderer* m_renderer = nullptr;
+    mutable Renderer *m_renderer = nullptr;
     e172::Image imageFromBitmap(const pixel_primitives::bitmap& btmp) const;
 public:
-    ConsoleGraphicsProvider(const std::vector<std::string>& args, std::ostream& output);
+    GraphicsProvider(const std::vector<std::string> &args, std::ostream &output);
 
     // AbstractGraphicsProvider interface
 public:
@@ -55,4 +52,4 @@ protected:
     }
 };
 
-#endif // CONSOLEGRAPHICSPROVIDER_H
+} // namespace e172::impl::console
