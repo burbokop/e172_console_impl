@@ -21,8 +21,8 @@ public:
     virtual e172::Image createImage(int width, int height) const override;
     virtual e172::Image createImage(int width, int height, const ImageInitFunction &imageInitFunction) const override;
     virtual e172::Image createImage(int width, int height, const ImageInitFunctionExt &imageInitFunction) const override;
-    virtual void loadFont(const std::string &name, const std::string &path) override {}
-    virtual bool fontLoaded(const std::string &name) const override { return false; }
+    virtual void loadFont(const std::string &, const std::string &) override {}
+    virtual bool fontLoaded(const std::string &) const override { return false; }
 
 protected:
     virtual void destructImage(e172::SharedContainer::DataPtr ptr) const override;

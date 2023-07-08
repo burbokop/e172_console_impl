@@ -74,7 +74,6 @@ e172::Image GraphicsProvider::createImage(int width,
 void GraphicsProvider::destructImage(e172::SharedContainer::DataPtr ptr) const
 {
     const auto &handle = e172::Image::castHandle<pixel_primitives::bitmap>(ptr);
-    const auto& siz = handle->c.width * handle->c.height;
     delete[] handle->c.matrix;
     delete handle;
 }

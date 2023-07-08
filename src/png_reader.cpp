@@ -46,8 +46,12 @@ pixel_primitives::bitmap read(std::istream &stream)
     const auto height = png_get_image_height(png_ptr, info_ptr);
     const auto color_type = png_get_color_type(png_ptr, info_ptr);
     const auto bit_depth = png_get_bit_depth(png_ptr, info_ptr);
-
     const auto number_of_passes = png_set_interlace_handling(png_ptr);
+
+    (void) color_type;
+    (void) bit_depth;
+    (void) number_of_passes;
+
     png_read_update_info(png_ptr, info_ptr);
 
     /* read file */

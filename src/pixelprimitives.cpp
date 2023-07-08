@@ -6,11 +6,11 @@
 namespace e172::impl::console::pixel_primitives {
 
 void draw_line(bitmap &btmp,
-               std::size_t point0_x,
-               std::size_t point0_y,
-               std::size_t point1_x,
-               std::size_t point1_y,
-               uint32_t argb)
+               std::int64_t point0_x,
+               std::int64_t point0_y,
+               std::int64_t point1_x,
+               std::int64_t point1_y,
+               e172::Color argb)
 {
     std::int64_t d, dL, dU, dx, dy, temp;
     dy = point1_y - point0_y;
@@ -84,7 +84,7 @@ void draw_line(bitmap &btmp,
 }
 
 void draw_square(
-    bitmap &btmp, std::size_t point_x, std::size_t point_y, std::size_t radius, uint32_t argb)
+    bitmap &btmp, std::size_t point_x, std::size_t point_y, std::size_t radius, Color argb)
 {
     const std::size_t len = radius * 2;
     for(std::size_t i = 0; i < len; i++) {
@@ -96,8 +96,7 @@ void draw_square(
     pixel(btmp, point_x + len, point_y + len) = argb;
 }
 
-void fill_square(
-    bitmap &btmp, std::size_t point_x, std::size_t point_y, std::size_t len, uint32_t argb)
+void fill_square(bitmap &btmp, std::size_t point_x, std::size_t point_y, std::size_t len, Color argb)
 {
     for (std::size_t i = 0; i < len; i++) {
         for (std::size_t j = 0; j < len; j++) {
@@ -111,7 +110,7 @@ void draw_rect(bitmap &btmp,
                std::size_t point0_y,
                std::size_t point1_x,
                std::size_t point1_y,
-               uint32_t argb)
+               Color argb)
 {
     const auto& min_x = std::min(point1_x, point0_x);
     const auto& max_x = std::max(point1_x, point0_x);
@@ -149,7 +148,7 @@ void fill_area(bitmap &btmp,
                std::size_t point0_y,
                std::size_t point1_x,
                std::size_t point1_y,
-               uint32_t argb)
+               Color argb)
 {
     std::int64_t dx = point1_x - point0_x, dy = point1_y - point0_y;
     if (dx >= 0) {
@@ -184,7 +183,7 @@ void fill_area(bitmap &btmp,
 }
 
 void draw_circle(
-    bitmap &btmp, std::size_t center_x, std::size_t center_y, std::size_t radius, uint32_t argb)
+    bitmap &btmp, std::size_t center_x, std::size_t center_y, std::size_t radius, Color argb)
 {
     std::int64_t i2 = std::numeric_limits<std::int64_t>::max();
     for(std::int64_t i = 0; i + 1 < i2; i++) {
@@ -202,12 +201,12 @@ void draw_circle(
 }
 
 void draw_grid(bitmap &btmp,
-               std::size_t point0_x,
-               std::size_t point0_y,
-               std::size_t point1_x,
-               std::size_t point1_y,
-               std::size_t interval,
-               uint32_t argb)
+               int64_t point0_x,
+               int64_t point0_y,
+               int64_t point1_x,
+               int64_t point1_y,
+               int64_t interval,
+               Color argb)
 {
     for (std::int64_t i = 0; i < (point1_x - point0_x) / interval; i++) {
         for (std::int64_t j = 0; j < point1_y - point0_y; j++) {
@@ -250,26 +249,6 @@ void copy_flipped(bitmap &dst_btmp, const bitmap &src_btmp, bool x_flip, bool y_
     }
 }
 
-std::uint32_t blend_argb(std::uint32_t top, std::uint32_t bottom)
-{
-    const auto ba = uint8_t((top >>  0) & 0x000000ff);
-    const auto ga = uint8_t((top >>  8) & 0x000000ff);
-    const auto ra = uint8_t((top >> 16) & 0x000000ff);
-    const auto aa = uint8_t((top >> 24) & 0x000000ff);
-
-    const auto bb = uint8_t((bottom >>  0) & 0x000000ff);
-    const auto gb = uint8_t((bottom >>  8) & 0x000000ff);
-    const auto rb = uint8_t((bottom >> 16) & 0x000000ff);
-    const auto ab = uint8_t((bottom >> 24) & 0x000000ff);
-
-    const uint32_t b_out = uint32_t((ba * aa / 255) + (bb * ab * (255 - aa) / (255 * 255))) << 0;
-    const uint32_t g_out = uint32_t((ga * aa / 255) + (gb * ab * (255 - aa) / (255 * 255))) << 8;
-    const uint32_t r_out = uint32_t((ra * aa / 255) + (rb * ab * (255 - aa) / (255 * 255))) << 16;
-    const uint32_t a_out = uint32_t(aa + (ab * (255 - aa) / 255)) << 24;
-
-    return a_out | r_out | g_out | b_out;
-}
-
 void blit(bitmap &dst_btmp,
           const bitmap &src_btmp,
           std::size_t offset_x,
@@ -277,15 +256,10 @@ void blit(bitmap &dst_btmp,
           std::size_t w,
           std::size_t h)
 {
-    //w = std::min(w, src_btmp.width);
-    //h = std::min(h, src_btmp.height);
-    //w = std::min(w, dst_btmp.width);
-    //h = std::min(h, dst_btmp.height);
-
     for (std::size_t y = 0; y < h; ++y) {
         for (std::size_t x = 0; x < w; ++x) {
             auto& bottom = pixel(dst_btmp, x + offset_x, y + offset_y);
-            bottom = blend_argb(pixel(src_btmp, x, y), bottom);
+            bottom = e172::blend(pixel(src_btmp, x, y), bottom);
         }
     }
 }
@@ -328,7 +302,7 @@ void blit_transformed(bitmap &dst_btmp,
 
             auto& bottom = pixel(dst_btmp, x + center_x, y + center_x);
 
-            bottom = blend_argb(result_src, bottom) ;
+            bottom = e172::blend(result_src, bottom);
             //pixel(dst_btmp, x + center_x, y + center_x) = src4;
         }
     }
