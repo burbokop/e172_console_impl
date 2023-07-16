@@ -37,6 +37,8 @@ target_sources(
          $<INSTALL_INTERFACE:${INSTALLDIR}/renderer.h>
          $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/src/graphicsprovider.h>
          $<INSTALL_INTERFACE:${INSTALLDIR}/graphicsprovider.h>
+         $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/src/eventprovider.h>
+         $<INSTALL_INTERFACE:${INSTALLDIR}/eventprovider.h>
          $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/src/colorizer/colorizer.h>
          $<INSTALL_INTERFACE:${INSTALLDIR}/colorizer/colorizer.h>
          $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/src/surface.h>
@@ -47,6 +49,7 @@ target_sources(
          $<INSTALL_INTERFACE:${INSTALLDIR}/png_reader.h>
   PRIVATE ${CMAKE_CURRENT_LIST_DIR}/src/renderer.cpp
           ${CMAKE_CURRENT_LIST_DIR}/src/graphicsprovider.cpp
+          ${CMAKE_CURRENT_LIST_DIR}/src/eventprovider.cpp
           ${CMAKE_CURRENT_LIST_DIR}/src/colorizer/colorizer.cpp
           ${CMAKE_CURRENT_LIST_DIR}/src/surface.cpp
           ${CMAKE_CURRENT_LIST_DIR}/src/pixelprimitives.cpp

@@ -7,22 +7,25 @@ namespace e172::impl::console {
 
 class GraphicsProvider : public e172::AbstractGraphicsProvider
 {
-    std::ostream& m_output;
-    mutable Renderer *m_renderer = nullptr;
-    e172::Image imageFromBitmap(const pixel_primitives::bitmap& btmp) const;
 public:
-    GraphicsProvider(const std::vector<std::string> &args, std::ostream &output);
+    GraphicsProvider(std::ostream &output, const Style &style = {});
 
     // AbstractGraphicsProvider interface
 public:
-    virtual e172::AbstractRenderer *renderer() const override;
-    virtual bool isValid() const override;
+    virtual std::shared_ptr<e172::AbstractRenderer> createRenderer(
+        const std::string &title, const Vector<std::uint32_t> &resolution) const override;
+
     virtual e172::Image loadImage(const std::string &path) const override;
-    virtual e172::Image createImage(int width, int height) const override;
-    virtual e172::Image createImage(int width, int height, const ImageInitFunction &imageInitFunction) const override;
-    virtual e172::Image createImage(int width, int height, const ImageInitFunctionExt &imageInitFunction) const override;
-    virtual void loadFont(const std::string &, const std::string &) override {}
+    virtual e172::Image createImage(std::size_t width, std::size_t height) const override;
+    virtual e172::Image createImage(std::size_t width,
+                                    std::size_t height,
+                                    const ImageInitFunction &imageInitFunction) const override;
+    virtual e172::Image createImage(std::size_t width,
+                                    std::size_t height,
+                                    const ImageInitFunctionExt &imageInitFunction) const override;
+    virtual void loadFont(const std::string &, const std::filesystem::path &) override {}
     virtual bool fontLoaded(const std::string &) const override { return false; }
+    virtual e172::Vector<std::uint32_t> screenSize() const override;
 
 protected:
     virtual void destructImage(e172::SharedContainer::DataPtr ptr) const override;
@@ -40,8 +43,8 @@ protected:
 
     virtual e172::SharedContainer::DataPtr blitImages(e172::SharedContainer::DataPtr ptr0,
                                                       e172::SharedContainer::DataPtr ptr1,
-                                                      int x,
-                                                      int y,
+                                                      std::ptrdiff_t x,
+                                                      std::ptrdiff_t y,
                                                       std::size_t &w,
                                                       std::size_t &h) const override;
 
@@ -50,6 +53,13 @@ protected:
     {
         return ptr;
     }
+
+private:
+    e172::Image imageFromBitmap(const pixel_primitives::bitmap &btmp) const;
+
+private:
+    std::ostream &m_output;
+    Style m_style;
 };
 
 } // namespace e172::impl::console

@@ -10,43 +10,48 @@ using VariantVector = std::vector<e172::Variant>;
 
 namespace e172::impl::console {
 
+class GraphicsProvider;
+
 class Renderer : public e172::AbstractRenderer
 {
-    Writer m_writer;
+    friend GraphicsProvider;
+    struct Private
+    {};
 
 public:
-    Renderer(std::ostream &output);
+    Renderer(Private, std::ostream &output, const Style &style);
 
     // AbstractRenderer interface
 protected:
     virtual bool update() override;
 
+    // AbstractRenderer interface
 public:
     virtual size_t presentEffectCount() const override { return 0; }
     virtual std::string presentEffectName(std::size_t) const override { return ""; }
     virtual void drawEffect(std::size_t, const e172::VariantVector &) override {}
     virtual void setDepth(std::int64_t) override {}
-    virtual void fill(uint32_t color) override;
+    virtual void fill(Color color) override;
     virtual void drawPixel(const e172::Vector<double> &point, e172::Color color) override;
     virtual void drawLine(const e172::Vector<double> &point0,
                           const e172::Vector<double> &point1,
-                          uint32_t color) override;
+                          Color color) override;
 
     virtual void drawRect(const e172::Vector<double> &point0,
                           const e172::Vector<double> &point1,
-                          uint32_t color,
+                          Color color,
                           const e172::ShapeFormat &format) override;
 
-    virtual void drawSquare(const e172::Vector<double> &point, int radius, uint32_t color) override;
-    virtual void drawCircle(const e172::Vector<double> &point, int radius, uint32_t color) override;
+    virtual void drawSquare(const e172::Vector<double> &center, double radius, Color color) override;
+    virtual void drawCircle(const e172::Vector<double> &center, double radius, Color color) override;
     virtual void drawDiagonalGrid(const e172::Vector<double> &,
                                   const e172::Vector<double> &,
-                                  int,
+                                  double,
                                   std::uint32_t) override
     {}
 
     virtual void drawImage(const e172::Image &image,
-                           const e172::Vector<double> &position,
+                           const e172::Vector<double> &center,
                            double angle,
                            double zoom) override;
 
@@ -73,9 +78,12 @@ public:
     virtual void enableEffect(std::uint64_t) override {}
     virtual void disableEffect(std::uint64_t) override {}
     virtual void setFullscreen(bool value) override;
-    virtual void setResolution(e172::Vector<double> value) override;
-    virtual e172::Vector<double> resolution() const override;
-    virtual e172::Vector<double> screenSize() const override;
+    virtual void setResolution(const e172::Vector<std::uint32_t> &value) override;
+    virtual e172::Vector<std::uint32_t> resolution() const override;
+
+private:
+    Writer m_writer;
+    Vector<double> m_position;
 };
 
 } // namespace e172::impl::console

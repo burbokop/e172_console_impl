@@ -1,25 +1,22 @@
 #include "surface.h"
 
-#include <sys/ioctl.h>
-#include <unistd.h>
-#include <ostream>
-#include <cstdio>
-#include <fstream>
 #include <cerrno>
-#include <iostream>
+#include <cstdio>
+#include <e172/consolecolor.h>
 #include <ext/stdio_filebuf.h>
 #include <ext/stdio_sync_filebuf.h>
+#include <fstream>
+#include <iostream>
+#include <ostream>
+#include <sys/ioctl.h>
+#include <unistd.h>
 
 namespace e172::impl::console {
 
-bool Writer::auto_resize() const
-{
-    return m_auto_resize;
-}
+namespace {
 
-void Writer::set_auto_resize(bool newAuto_resize)
-{
-    m_auto_resize = newAuto_resize;
+constexpr const char *ClearScreenSeq = "\x1B[2J\x1B[H";
+
 }
 
 std::ostream &Writer::output() const
@@ -27,27 +24,9 @@ std::ostream &Writer::output() const
     return m_output;
 }
 
-double Writer::symbol_wh_fraction() const
-{
-    return m_symbol_wh_fraction;
-}
-
-Writer::Writer(std::ostream &output,
-               const Colorizer *colorizer,
-               const std::string &gradient,
-               double contrast,
-               bool auto_resize,
-               uint32_t mask,
-               bool ignore_alpha,
-               double symbol_wh_fraction)
+Writer::Writer(std::ostream &output, const Style &style)
     : m_output(output)
-    , m_colorizer(colorizer)
-    , m_gradient(gradient)
-    , m_contrast(contrast)
-    , m_auto_resize(auto_resize)
-    , m_mask(mask)
-    , m_ignore_alpha(ignore_alpha)
-    , m_symbol_wh_fraction(symbol_wh_fraction)
+    , m_style(style)
 {}
 
 char Writer::charFromArgb(uint32_t argb) const
@@ -57,16 +36,15 @@ char Writer::charFromArgb(uint32_t argb) const
 
 char Writer::charFromBrightness(uint8_t brightness) const
 {
-    if(std::abs(m_contrast - 1) >= std::numeric_limits<double>::epsilon()) {
-        brightness = (brightness - 0x88) * m_contrast + 0x88;
+    if (std::abs(m_style.contrast - 1) >= std::numeric_limits<double>::epsilon()) {
+        brightness = (brightness - 0x88) * m_style.contrast + 0x88;
     }
-    return m_gradient[brightness * (m_gradient.size() - 1) / 0xff];
+    return m_style.gradient[brightness * (m_style.gradient.size() - 1) / 0xff];
 }
 
-std::pair<std::size_t, std::size_t> Writer::output_stream_size(const std::ostream &stream,
-                                                               double wh_fraction)
+e172::Vector<uint32_t> Writer::outputStreamSize(const std::ostream &stream, double whFraction)
 {
-    if(const auto& fd = output_stream_descriptor(stream)) {
+    if (const auto &fd = outputStreamDescriptor(stream)) {
         int cols = 80;
         int lines = 24;
 
@@ -82,15 +60,18 @@ std::pair<std::size_t, std::size_t> Writer::output_stream_size(const std::ostrea
         lines = ts.ws_row;
 #endif /* TIOCGSIZE */
 
+        //std::cout << "fd: " << *fd << ", cols: " << cols << ", lines: " << lines << std::endl;
 
-        std::cout << "fd: " << *fd << ", cols: " << cols << ", lines: " << lines << std::endl;
+        assert(cols >= 0);
+        assert(lines >= 0);
 
-        return { cols * wh_fraction, lines - 1 /* one line is input */ };
+        return {static_cast<std::uint32_t>(cols * whFraction),
+                static_cast<std::uint32_t>(lines - 1) /* one line is input */};
     }
     return { 0, 0 };
 }
 
-std::optional<int> Writer::output_stream_descriptor(const std::ostream &stream)
+std::optional<int> Writer::outputStreamDescriptor(const std::ostream &stream)
 {
     const auto& stdio_buf = dynamic_cast<__gnu_cxx::stdio_filebuf<char>*>(stream.rdbuf());
     if(stdio_buf) {
@@ -110,7 +91,7 @@ std::optional<int> Writer::output_stream_descriptor(const std::ostream &stream)
     return std::nullopt;
 }
 
-void Writer::set_frame_size(std::size_t w, std::size_t h)
+void Writer::setFrameSize(std::size_t w, std::size_t h)
 {
     if(w != m_bitmap.width || h != m_bitmap.height) {
         if(w != 0 && h != 0) {
@@ -122,29 +103,33 @@ void Writer::set_frame_size(std::size_t w, std::size_t h)
     }
 }
 
-std::size_t Writer::write_frame()
+std::size_t Writer::writeFrame()
 {
     std::size_t result = 0;
     if(m_bitmap && m_bitmap.width > 0 && m_bitmap.height > 0) {
-        const auto w = m_bitmap.width / m_symbol_wh_fraction;
+        const auto w = m_bitmap.width / m_style.symbolWHFraction;
         const auto h = m_bitmap.height;
 
         std::string buffer; //{ buffer.reserve(); }
         std::string lastColorCode;
         for(std::size_t y = 0; y < h; ++y) {
             for(std::size_t x = 0; x < w; ++x) {
-                std::uint32_t argb = pixel_primitives::pixel(m_bitmap, x * m_symbol_wh_fraction, y);
+                std::uint32_t argb = pixel_primitives::pixel(m_bitmap,
+                                                             x * m_style.symbolWHFraction,
+                                                             y);
 
-                if(m_ignore_alpha) { argb |= 0xff000000; }
-                argb &= m_mask;
+                if (m_style.ignoreAlpha) {
+                    argb |= 0xff000000;
+                }
+                argb &= m_style.mask;
 
-                if(m_colorizer) {
-                    std::string cc = m_colorizer->beginSeq(argb);
+                if (m_style.colorizer) {
+                    std::string cc = m_style.colorizer->beginSeq(argb);
                     if(cc != lastColorCode) {
                         if(cc.size() > 0) {
                             buffer += cc;
                         } else {
-                            buffer += m_colorizer->endSeq();
+                            buffer += m_style.colorizer->endSeq();
                         }
                         lastColorCode = cc;
                     }
@@ -154,11 +139,12 @@ std::size_t Writer::write_frame()
             buffer += '\n';
         }
         m_output.write(buffer.c_str(), buffer.size());
+        m_output << e172::cc::Default;
         result = buffer.size();
     }
-    if(m_auto_resize) {
-        const auto& size = output_stream_size(m_output, m_symbol_wh_fraction);
-        set_frame_size(size.first, size.second);
+    if (m_autoResize) {
+        const auto &size = outputStreamSize(m_output, m_style.symbolWHFraction);
+        setFrameSize(size.x(), size.y());
     }
     return result;
 }
@@ -168,6 +154,7 @@ Writer::~Writer()
     if(m_bitmap) {
         delete m_bitmap.matrix;
     }
+    m_output << ClearScreenSeq;
 }
 
 } // namespace e172::impl::console

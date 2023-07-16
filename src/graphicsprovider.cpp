@@ -12,22 +12,17 @@ e172::Image GraphicsProvider::imageFromBitmap(const pixel_primitives::bitmap &bt
                          btmp.height);
 }
 
-GraphicsProvider::GraphicsProvider(const std::vector<std::string> &args, std::ostream &output)
-    : e172::AbstractGraphicsProvider(args)
-    , m_output(output)
+GraphicsProvider::GraphicsProvider(std::ostream &output, const Style &style)
+    : m_output(output)
+    , m_style(style)
 {}
 
-e172::AbstractRenderer *GraphicsProvider::renderer() const
+std::shared_ptr<AbstractRenderer> GraphicsProvider::createRenderer(
+    const std::string &, const Vector<std::uint32_t> &) const
 {
-    if(!m_renderer) {
-        m_renderer = new Renderer(m_output);
-    }
-    return m_renderer;
-}
-
-bool GraphicsProvider::isValid() const
-{
-    return m_output.rdbuf();
+    const auto renderer = std::make_shared<Renderer>(Renderer::Private{}, m_output, m_style);
+    installParentToRenderer(*renderer);
+    return renderer;
 }
 
 e172::Image GraphicsProvider::loadImage(const std::string &path) const
@@ -38,33 +33,30 @@ e172::Image GraphicsProvider::loadImage(const std::string &path) const
     return imageFromBitmap(btmp);
 }
 
-e172::Image GraphicsProvider::createImage(int width, int height) const
+e172::Image GraphicsProvider::createImage(std::size_t width, std::size_t height) const
 {
-    return imageFromBitmap(pixel_primitives::bitmap {
-                               new std::uint32_t[width * height],
-                               std::size_t(width),
-                               std::size_t(height)
-                           });
+    return imageFromBitmap(
+        pixel_primitives::bitmap{new std::uint32_t[width * height], width, height});
 }
 
-e172::Image GraphicsProvider::createImage(int width,
-                                          int height,
+e172::Image GraphicsProvider::createImage(std::size_t width,
+                                          std::size_t height,
                                           const ImageInitFunction &imageInitFunction) const
 {
     if(imageInitFunction) {
-        pixel_primitives::bitmap btmp { new std::uint32_t[width * height], std::size_t(width), std::size_t(height) };
+        pixel_primitives::bitmap btmp{new std::uint32_t[width * height], width, height};
         imageInitFunction(btmp.matrix);
         return imageFromBitmap(btmp);
     }
     return e172::Image();
 }
 
-e172::Image GraphicsProvider::createImage(int width,
-                                          int height,
+e172::Image GraphicsProvider::createImage(std::size_t width,
+                                          std::size_t height,
                                           const ImageInitFunctionExt &imageInitFunction) const
 {
     if(imageInitFunction) {
-        pixel_primitives::bitmap btmp { new std::uint32_t[width * height], std::size_t(width), std::size_t(height) };
+        pixel_primitives::bitmap btmp{new std::uint32_t[width * height], width, height};
         imageInitFunction(width, height, btmp.matrix);
         return imageFromBitmap(btmp);
     }
@@ -97,8 +89,8 @@ e172::SharedContainer::DataPtr GraphicsProvider::imageFragment(e172::SharedConta
 
 e172::SharedContainer::DataPtr GraphicsProvider::blitImages(e172::SharedContainer::DataPtr ptr0,
                                                             e172::SharedContainer::DataPtr ptr1,
-                                                            int x,
-                                                            int y,
+                                                            std::ptrdiff_t x,
+                                                            std::ptrdiff_t y,
                                                             std::size_t &w,
                                                             std::size_t &h) const
 {
@@ -108,6 +100,11 @@ e172::SharedContainer::DataPtr GraphicsProvider::blitImages(e172::SharedContaine
     pixel_primitives::copy(result, btmp0);
     pixel_primitives::blit(result, btmp1, x, y, w, h);
     return new e172::Image::Handle<pixel_primitives::bitmap>(result);
+}
+
+e172::Vector<uint32_t> GraphicsProvider::screenSize() const
+{
+    return Writer::outputStreamSize(m_output, m_style.symbolWHFraction);
 }
 
 } // namespace e172::impl::console

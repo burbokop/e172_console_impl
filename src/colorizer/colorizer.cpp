@@ -39,10 +39,12 @@ std::string AnsiColorizer::endSeq() const
     return AnsiColorizer::reset;
 }
 
-ansi_true_colorizer::ansi_true_colorizer(uint8_t deterioration)
-    : m_deterioration(deterioration) {}
+AnsiTrueColorizer::AnsiTrueColorizer(uint8_t deterioration)
+    : m_deterioration(deterioration)
+{}
 
-std::string ansi_true_colorizer::beginSeq(uint32_t argb) const {
+std::string AnsiTrueColorizer::beginSeq(uint32_t argb) const
+{
     const auto& r = std::to_string((std::uint8_t(argb >> 16) / m_deterioration) * m_deterioration);
     const auto& g = std::to_string((std::uint8_t(argb >> 8) / m_deterioration) * m_deterioration);
     const auto& b = std::to_string((std::uint8_t(argb >> 0) / m_deterioration) * m_deterioration);
@@ -54,8 +56,9 @@ std::string ansi_true_colorizer::beginSeq(uint32_t argb) const {
     return "\033[38;2;" + r + ";" + g + ";" + b + "m";
 }
 
-std::string ansi_true_colorizer::endSeq() const {
-    return ansi_true_colorizer::reset;
+std::string AnsiTrueColorizer::endSeq() const
+{
+    return AnsiTrueColorizer::reset;
 }
 
 } // namespace e172::impl::console

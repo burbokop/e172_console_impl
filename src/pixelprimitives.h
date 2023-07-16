@@ -77,10 +77,10 @@ inline void draw_horizontal_line(
 }
 
 void draw_square(
-    bitmap &btmp, std::size_t point_x, std::size_t point_y, std::size_t radius, e172::Color argb);
+    bitmap &btmp, std::size_t center_x, std::size_t center_y, std::size_t radius, e172::Color argb);
 
 void fill_square(
-    bitmap &btmp, std::size_t point_x, std::size_t point_y, std::size_t len, e172::Color argb);
+    bitmap &btmp, std::size_t center_x, std::size_t center_y, std::size_t radius, e172::Color argb);
 
 void draw_rect(bitmap &btmp,
                std::size_t point0_x,
@@ -130,14 +130,12 @@ inline void blit(bitmap &dst_btmp, const bitmap &src_btmp, std::size_t offset_x,
     blit(dst_btmp, src_btmp, offset_x, offset_y, src_btmp.width, src_btmp.height);
 }
 
-void blit_transformed(
-        bitmap &dst_btmp,
-        const bitmap &src_btmp,
-        const std::complex<double> &rotor,
-        const double scaler,
-        std::size_t center_x,
-        std::size_t center_y
-        );
+void blit_transformed(bitmap &dst_btmp,
+                      const bitmap &src_btmp,
+                      const std::complex<double> &rotor,
+                      const double scaler,
+                      const std::size_t center_x,
+                      const std::size_t center_y);
 
 inline void blit_transformed(
         bitmap &dst_btmp,

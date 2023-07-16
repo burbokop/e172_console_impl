@@ -70,13 +70,13 @@ public:
     virtual std::string endSeq() const override;
 };
 
-class ansi_true_colorizer : public Colorizer
+class AnsiTrueColorizer : public Colorizer
 {
     std::uint8_t m_deterioration;
 public:
     static inline const char* reset = "\033[0m";
 
-    ansi_true_colorizer(std::uint8_t deterioration = 1);
+    AnsiTrueColorizer(std::uint8_t deterioration = 1);
 
     // colorizer interface
 public:

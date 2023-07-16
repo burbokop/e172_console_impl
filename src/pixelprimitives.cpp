@@ -84,23 +84,30 @@ void draw_line(bitmap &btmp,
 }
 
 void draw_square(
-    bitmap &btmp, std::size_t point_x, std::size_t point_y, std::size_t radius, Color argb)
+    bitmap &btmp, std::size_t center_x, std::size_t center_y, std::size_t radius, Color argb)
 {
+    const auto begin_x = center_x - radius;
+    const auto begin_y = center_y - radius;
     const std::size_t len = radius * 2;
-    for(std::size_t i = 0; i < len; i++) {
-        pixel(btmp, point_x + i, point_y) = argb;
-        pixel(btmp, point_x + i, point_y + len) = argb;
-        pixel(btmp, point_x, point_y + i) = argb;
-        pixel(btmp, point_x + len, point_y + i) = argb;
+
+    for (std::size_t i = 0; i < len; i++) {
+        pixel(btmp, begin_x + i, begin_y) = argb;
+        pixel(btmp, begin_x + i, begin_y + len) = argb;
+        pixel(btmp, begin_x, begin_y + i) = argb;
+        pixel(btmp, begin_x + len, begin_y + i) = argb;
     }
-    pixel(btmp, point_x + len, point_y + len) = argb;
+    pixel(btmp, begin_x + len, begin_y + len) = argb;
 }
 
-void fill_square(bitmap &btmp, std::size_t point_x, std::size_t point_y, std::size_t len, Color argb)
+void fill_square(
+    bitmap &btmp, std::size_t center_x, std::size_t center_y, std::size_t radius, Color argb)
 {
+    const auto begin_x = center_x - radius;
+    const auto begin_y = center_y - radius;
+    const std::size_t len = radius * 2;
     for (std::size_t i = 0; i < len; i++) {
         for (std::size_t j = 0; j < len; j++) {
-            pixel(btmp, point_x + j, point_y + i) = argb;
+            pixel(btmp, begin_x + j, begin_y + i) = argb;
         }
     }
 }
@@ -268,8 +275,8 @@ void blit_transformed(bitmap &dst_btmp,
                       const bitmap &src_btmp,
                       const std::complex<double> &rotor,
                       const double scaler,
-                      std::size_t center_x,
-                      std::size_t center_y)
+                      const std::size_t center_x,
+                      const std::size_t center_y)
 {
     const auto& lt = rotor * std::complex<double>(-double(src_btmp.width) / 2 * scaler, -double(src_btmp.height) / 2 * scaler);
     const auto& rt = rotor * std::complex<double>( double(src_btmp.width) / 2 * scaler, -double(src_btmp.height) / 2 * scaler);
@@ -300,29 +307,27 @@ void blit_transformed(bitmap &dst_btmp,
 
             std::uint32_t result_src = aver_argb<4>({ src0, src1, src2, src3 });
 
-            auto& bottom = pixel(dst_btmp, x + center_x, y + center_x);
+            auto &bottom = pixel(dst_btmp, x + center_x, y + center_y);
 
             bottom = e172::blend(result_src, bottom);
-            //pixel(dst_btmp, x + center_x, y + center_x) = src4;
+            //pixel(dst_btmp, x + center_x, y + center_y) = src4;
         }
     }
+    /*
+    draw_square(dst_btmp, center_x, center_y, 4, 0xff00ff00);
 
-    draw_circle(dst_btmp, center_x, center_x, 8, 0xff00ff00);
+    draw_square(dst_btmp, lt.real() + center_x, lt.imag() + center_y, 4, 0xff00ff00);
+    draw_square(dst_btmp, rt.real() + center_x, rt.imag() + center_y, 4, 0xff00ff00);
+    draw_square(dst_btmp, lb.real() + center_x, lb.imag() + center_y, 4, 0xff00ff00);
+    draw_square(dst_btmp, rb.real() + center_x, rb.imag() + center_y, 4, 0xff00ff00);
 
-    draw_circle(dst_btmp, lt.real() + center_x, lt.imag() + center_y, 4, 0xff00ff00);
-    draw_circle(dst_btmp, rt.real() + center_x, rt.imag() + center_y, 4, 0xff00ff00);
-    draw_circle(dst_btmp, lb.real() + center_x, lb.imag() + center_y, 4, 0xff00ff00);
-    draw_circle(dst_btmp, rb.real() + center_x, rb.imag() + center_y, 4, 0xff00ff00);
-
-
-    draw_rect(
-                dst_btmp,
-                *min_x + center_x,
-                *min_y + center_y,
-                *max_x + center_x,
-                *max_y + center_y,
-                0xff0000ff
-                );
+    draw_rect(dst_btmp,
+              *min_x + center_x,
+              *min_y + center_y,
+              *max_x + center_x,
+              *max_y + center_y,
+              0xff0000ff);
+    */
 }
 
 } // namespace e172::impl::console::pixel_primitives

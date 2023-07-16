@@ -1,61 +1,19 @@
-
+#include "../../src/eventprovider.h"
+#include "../../src/graphicsprovider.h"
 #include "../../src/png_reader.h"
 #include "mp4_decoder.h"
 #include "painter.h"
+#include "videoplayer.h"
 #include <SDL2/SDL.h>
 #include <cassert>
 #include <curses.h>
+#include <e172/gameapplication.h>
+#include <e172/net/linux/socket.h>
 #include <e172/utility/flagparser.h>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
-#include <termios.h>
 #include <thread>
-
-int getch2(FILE *file) {
-      int c=0;
-
-      struct termios org_opts, new_opts;
-      int res=0;
-          //-----  store old settings -----------
-      res=tcgetattr(fileno(file), &org_opts);
-      assert(res==0);
-          //---- set new terminal parms --------
-      memcpy(&new_opts, &org_opts, sizeof(new_opts));
-      new_opts.c_lflag &= ~(ICANON | ECHO | ECHOE | ECHOK | ECHONL | ECHOPRT | ECHOKE | ICRNL);
-      new_opts.c_cc[VTIME] = 10;
-      new_opts.c_cc[VMIN] = 1;
-      tcsetattr(fileno(file), TCSANOW, &new_opts);
-
-      c=fgetc(file);
-          //------  restore old settings ---------
-      res=tcsetattr(fileno(file), TCSANOW, &org_opts);
-      assert(res==0);
-      return(c);
-}
-
-int getkey(FILE *file) {
-    int character;
-    struct termios orig_term_attr;
-    struct termios new_term_attr;
-
-    /* set the terminal to raw mode */
-    tcgetattr(fileno(file), &orig_term_attr);
-    memcpy(&new_term_attr, &orig_term_attr, sizeof(struct termios));
-    new_term_attr.c_lflag &= ~(ECHO|ICANON);
-    new_term_attr.c_cc[VTIME] = 0;
-    new_term_attr.c_cc[VMIN] = 100;
-    tcsetattr(fileno(file), TCSANOW, &new_term_attr);
-
-    /* read a character from the stdin stream without blocking */
-    /*   returns EOF (-1) if no character is available */
-    character = fgetc(file);
-
-    /* restore the original terminal attributes */
-    tcsetattr(fileno(file), TCSANOW, &orig_term_attr);
-
-    return character;
-}
 
 namespace e172::impl::console::video_player {
 
@@ -74,7 +32,13 @@ struct Flags
     /// input file path
     std::filesystem::path input;
     double scale;
+    bool v2;
+    double contrast;
+    std::uint8_t deterioration;
 };
+
+int mainV1(int argc, const char **argv, const Flags &flags);
+int mainV2(int argc, const char **argv, const Flags &flags);
 
 int main(int argc, const char **argv)
 {
@@ -83,14 +47,26 @@ int main(int argc, const char **argv)
               argc,
               argv,
               [](e172::FlagParser &p) {
-                  return Flags{.input = p.flag<std::filesystem::path>(
-                                   e172::Flag{.shortName = "i",
-                                              .longName = "input",
-                                              .description = "Input file path (.mp4 file)"}),
-                               .scale = p.flag<double>(
-                                   e172::Flag{.shortName = "s",
-                                              .longName = "scale",
-                                              .description = "Scale of video frame"})};
+                  return Flags{
+                      .input = p.flag<std::filesystem::path>(
+                          e172::Flag{.shortName = "i",
+                                     .longName = "input",
+                                     .description = "Input file path (.mp4 file)"}),
+                      .scale = p.flag<double>(e172::Flag{.shortName = "s",
+                                                         .longName = "scale",
+                                                         .description = "Scale of video frame"}),
+                      .v2 = p.flag<bool>(e172::Flag{.shortName = "v2",
+                                                    .longName = "use-version2",
+                                                    .description = "Use version 2"}),
+                      .contrast = p.flag(e172::OptFlag<double>{.shortName = "c",
+                                                               .longName = "contrast",
+                                                               .description = "Contrast of video",
+                                                               .defaultVal = 1}),
+                      .deterioration = p.flag(
+                          e172::OptFlag<std::uint8_t>{.shortName = "d",
+                                                      .longName = "deterioration",
+                                                      .description = "Deterioration of color",
+                                                      .defaultVal = 32})};
               },
               [](const e172::FlagParser &p) {
                   p.displayErr(std::cerr);
@@ -103,20 +79,38 @@ int main(int argc, const char **argv)
               nullptr)
               .value();
 
-    using namespace e172::impl::console;
+    if (flags.v2) {
+        return mainV2(argc, argv, flags);
+    } else {
+        return mainV1(argc, argv, flags);
+    }
+}
 
-    //std::vector<pixel_primitives::bitmap> vvv;
+int mainV1(int argc, const char **argv, const Flags &flags)
+{
+    using namespace e172::impl::console;
 
     std::iostream null(0);
 
     const auto absolutePath = std::filesystem::absolute(flags.input);
-    video_player::mp4_decoder decoder(absolutePath.c_str(), null, flags.scale);
+    video_player::MP4Decoder decoder(absolutePath.c_str(), null, flags.scale);
 
-    std::cout << "Frame count: " << decoder.frame_count() << std::endl
-              << "Hold enter or space button to play" << std::endl
-              << "A to rewind back" << std::endl
-              << "D to rewind forward" << std::endl
-              << "& any other bytton to exit" << std::endl;
+    std::cout << "Frame count: " << decoder.frameCount() << std::endl
+              << "press Left to rewind back" << std::endl
+              << "right to rewind forward" << std::endl
+              << "space to pause" << std::endl
+              << "esc to exit" << std::endl
+              << "To begin press any button";
+
+    EventProvider eventProvider(null);
+    while (!eventProvider.pullEvent()) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
+
+    const auto graphicsProvider = std::make_shared<GraphicsProvider>(std::cout);
+    e172::GameApplication app(argc, argv);
+    app.setGraphicsProvider(graphicsProvider);
+    app.initRenderer("video player", decoder.size());
 
     //return 0;
 
@@ -136,11 +130,14 @@ int main(int argc, const char **argv)
     video_player::painter p;
 
     AnsiColorizer ansi_colorizer;
-    ansi_true_colorizer ansi_true_colorizer = 32;
 
     std::ofstream out("output.ansi", std::ios::out);
 
-    Writer s(std::cout, &ansi_true_colorizer, Writer::default_gradient, 1, true, 0xffffffff, false);
+    Writer s(std::cout,
+             Style{.colorizer = std::make_shared<AnsiTrueColorizer>(flags.deterioration),
+                   .gradient = DefaultGradient,
+                   .contrast = flags.contrast,
+                   .ignoreAlpha = false});
 
     std::size_t last_w = 0;
     std::size_t last_h = 0;
@@ -152,9 +149,39 @@ int main(int argc, const char **argv)
     std::size_t frame_index = 0;
     double angle = 0;
 
-    while (true) {
+    bool framesIncrementing = true;
+    bool exit = false;
+    while (!exit && frame_index < decoder.frameCount()) {
         if (updateTimer.check()) {
-            pixel_primitives::fill_area(s.bitmap(), 0, 0, s.bitmap().width, s.bitmap().height, 0x00000000);
+            constexpr std::size_t rewindStep = 20;
+
+            while (const auto &event = eventProvider.pullEvent()) {
+                if (event->type() == e172::Event::KeyUp) {
+                    if (event->scancode().value() == e172::ScancodeLeft) {
+                        if (frame_index > rewindStep) {
+                            frame_index -= rewindStep;
+                        } else {
+                            frame_index = 0;
+                        }
+                    } else if (event->scancode().value() == e172::ScancodeRight) {
+                        frame_index = (frame_index + rewindStep) % decoder.frameCount();
+                    } else if (event->scancode().value() == e172::ScancodeSpace) {
+                        framesIncrementing = !framesIncrementing;
+                    } else if (event->scancode().value() == e172::ScancodeEscape) {
+                        exit = true;
+                    }
+                }
+            }
+
+            if (!framesIncrementing)
+                continue;
+
+            pixel_primitives::fill_area(s.bitmap(),
+                                        0,
+                                        0,
+                                        s.bitmap().width,
+                                        s.bitmap().height,
+                                        0x00000000);
 
             p.paint(s.bitmap());
 
@@ -173,32 +200,13 @@ int main(int argc, const char **argv)
                                           12,
                                           0xff00ff00);
 
-            const int key = getch2(stdin);
-            //const int c1 = getch();
-
-            constexpr std::size_t rewindStep = 20;
-
-            if (key == 0x61) {
-                if (frame_index > rewindStep) {
-                    frame_index -= rewindStep;
-                } else {
-                    frame_index = 0;
-                }
-            } else if (key == 0x64) {
-                frame_index = (frame_index + rewindStep) % decoder.frame_count();
-            } else if (key != 0x20 && key != 0x0a) {
-                std::cout << "unknown key `" << std::hex << key << "` interpreted as quit"
-                          << std::endl;
-                break;
-            }
-
             //pixel_primitives::rotate(s.bitmap(),
             //                         decoder.frame(frame_index),
             //                         std::complex<double>(std::cos(angle), std::sin(angle)));
 
-            pixel_primitives::copy(s.bitmap(), decoder.frame(frame_index));
+            pixel_primitives::copy(s.bitmap(), decoder.frame(frame_index, *graphicsProvider).bitmap);
 
-            pixel_primitives::blit(s.bitmap(), decoder.frame(frame_index), 0, 0);
+            //pixel_primitives::blit(s.bitmap(), decoder.frame(frame_index), 0, 0);
 
             if (false && (s.bitmap().width != last_w || s.bitmap().height != last_h)) {
                 SDL_FreeSurface(sdl_surface);
@@ -212,10 +220,10 @@ int main(int argc, const char **argv)
             auto btmp = video_player::sdl_surface_to_bitmap(sdl_surface);
             pixel_primitives::copy(btmp, s.bitmap());
 
-            const auto frame = decoder.frame(frame_index);
+            const auto frame = decoder.frame(frame_index, *graphicsProvider);
 
             pixel_primitives::blit_transformed(btmp,
-                                               frame,
+                                               frame.bitmap,
                                                std::complex<double>(std::cos(angle),
                                                                     std::sin(angle)),
                                                (std::sin(frame_index * 0.02) + 2) / 3.,
@@ -225,18 +233,81 @@ int main(int argc, const char **argv)
 
             //if(frameChangeTimer.check()) {
             ++frame_index;
-            frame_index %= decoder.frame_count();
+            frame_index %= decoder.frameCount();
             //}
 
             SDL_UnlockSurface(sdl_surface);
 
-            s.write_frame();
+            //app.renderer()->drawImage(frame.image, {}, 0, 1);
 
-            std::cout << "key: " << key << ", frame: " << frame_index << std::endl;
+            s.writeFrame();
+
+            std::cout << "frame: " << frame_index << "/" << decoder.frameCount() << " ("
+                      << frame_index * 100 / decoder.frameCount() << "%)" << std::endl;
 
             SDL_UpdateWindowSurface(window);
         }
     }
 
     return 0;
+}
+
+int mainV2(int argc, const char **argv, const Flags &flags)
+{
+    auto a = new std::uint32_t[426 * 240];
+
+    std::cout << "a: " << a << std::endl;
+
+    using namespace e172::impl::console;
+
+    std::iostream null(0);
+    std::ofstream log("/tmp/console-event-provider.log");
+
+    const auto decoder = std::make_shared<video_player::MP4Decoder>(std::filesystem::absolute(
+                                                                        flags.input),
+                                                                    null,
+                                                                    flags.scale);
+
+    e172::GameApplication app(argc, argv);
+
+    AnsiTrueColorizer colorizer = 32;
+
+    const auto graphicsProvider
+        = std::make_shared<GraphicsProvider>(std::cout,
+                                             Style{.colorizer = std::make_shared<AnsiTrueColorizer>(
+                                                       flags.deterioration),
+                                                   .gradient = DefaultGradient,
+                                                   .contrast = flags.contrast});
+
+    const auto eventProvider = std::make_shared<EventProvider>(log);
+
+    std::cout
+        << "Frame count: " << decoder->frameCount() << std::endl
+        << "Frame rate: " << decoder->frameRate().intoReal() << std::endl
+        << "Draw area size: " << graphicsProvider->screenSize() << std::endl
+        << "Control buttons:" << std::endl
+        << "  Left    - rewind back" << std::endl
+        << "  Right   - rewind forward" << std::endl
+        << "  Space   - pause" << std::endl
+        << "  Plus    - zoom in" << std::endl
+        << "  Minus   - zoom out" << std::endl
+        << "  Esc | Q - exit" << std::endl
+        << "Also you can use Ctrl + Mouse weel on most terminal emulators to change draw area size"
+        << std::endl
+        << "To begin press any button" << std::endl;
+
+    while (!eventProvider->pullEvent()) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
+
+    app.setGraphicsProvider(graphicsProvider);
+    app.setEventProvider(eventProvider);
+    app.initRenderer("video player", graphicsProvider->screenSize());
+
+    app.setProccedInterval(1000 / 60);
+    app.setRenderInterval(1000 / 60);
+
+    app.addApplicationExtension<video_player::VideoPlayerExtension>(std::cout, decoder);
+
+    return app.exec();
 }

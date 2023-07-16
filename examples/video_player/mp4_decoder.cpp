@@ -1,15 +1,166 @@
 #include "mp4_decoder.h"
 
+#include <e172/utility/either.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+#include <libavcodec/avcodec.h>
+#include <libavdevice/avdevice.h>
+#include <libavfilter/avfilter.h>
+#include <libavformat/avformat.h>
+#include <libavutil/avutil.h>
+#include <libavutil/imgutils.h>
+#include <libavutil/pixfmt.h>
+#include <libswscale/swscale.h>
+#ifdef __cplusplus
+}
+#endif
+
+#include <e172/graphics/abstractgraphicsprovider.h>
+
 namespace e172::impl::console::video_player {
 
-mp4_decoder::mp4_decoder(const char *path,
-        std::ostream &log,
-        double scale
-        )
-    : m_path(path),
-      m_log(log),
-      m_scale(scale) {
-    if (!path) {
+namespace {
+
+void copyFrameToBuffer(Byte *dst,
+                       AVFrame *frame,
+                       AVCodecContext *codecContext,
+                       SwsContext *imageConvertContext,
+                       std::size_t destinationWidth,
+                       std::size_t destinationHeight,
+                       AVPixelFormat destinationFormat)
+{
+    constexpr std::size_t align = 1;
+    struct Picture
+    {
+        std::uint8_t *data[AV_NUM_DATA_POINTERS];
+        int linesize[AV_NUM_DATA_POINTERS];
+    };
+
+    Picture picture;
+    av_image_fill_arrays(picture.data,
+                         picture.linesize,
+                         dst,
+                         destinationFormat,
+                         destinationWidth,
+                         destinationHeight,
+                         align);
+
+    sws_scale(imageConvertContext,
+              frame->data,
+              frame->linesize,
+              0,
+              codecContext->height,
+              picture.data,
+              picture.linesize);
+}
+
+struct DecodeError
+{
+    std::string during;
+    int averrcode;
+};
+
+std::ostream &operator<<(std::ostream &stream, DecodeError err)
+{
+    return stream << "Decode error " << err.during << ": " << av_err2str(err.averrcode);
+}
+
+Either<DecodeError, Void> decodePacket(std::vector<MP4Decoder::Frame> &dst_btmps,
+                                       AVPacket *packet,
+                                       AVCodecContext *codecContext,
+                                       SwsContext *imageConvertContext,
+                                       AVFrame *frame,
+                                       std::ostream &log,
+                                       std::size_t destinationWidth,
+                                       std::size_t destinationHeight,
+                                       AVPixelFormat destinationFormat,
+                                       const e172::AbstractGraphicsProvider &graphicsProvider)
+{
+    auto response = avcodec_send_packet(codecContext, packet);
+    if (response < 0) {
+        return Left(
+            DecodeError{.during = "during sending a packet to the decoder", .averrcode = response});
+    }
+
+    while (response >= 0) {
+        response = avcodec_receive_frame(codecContext, frame);
+        if (response == AVERROR(EAGAIN) || response == AVERROR_EOF) {
+            break;
+        } else if (response < 0) {
+            return Left(DecodeError{.during = "during receiving a frame from the decoder",
+                                    .averrcode = response});
+        }
+
+        if (response >= 0) {
+            bool log_frame = false;
+
+            if (log_frame) {
+                log << "Frame " << codecContext->frame_number
+                    << " (type=" << av_get_picture_type_char(frame->pict_type)
+                    << ", size=" << frame->pkt_size
+                    << " bytes, format=" << av_get_sample_fmt_name(AVSampleFormat(frame->format))
+                    << ") pts " << frame->pts << " key_frame " << frame->key_frame << " [DTS "
+                    << frame->coded_picture_number << "]" << std::endl;
+            }
+
+            if (log_frame) {
+                log << "\tw: " << frame->width << ", h: " << frame->height << std::endl;
+                log << "\tlen 0: " << frame->linesize[0] << std::endl;
+                log << "\tlen 1: " << frame->linesize[1] << std::endl;
+                log << "\tlen 2: " << frame->linesize[2] << std::endl;
+                log << "\tlen 3: " << frame->linesize[3] << std::endl;
+                log << "\tlen 4: " << frame->linesize[4] << std::endl;
+                log << "\tlen 5: " << frame->linesize[5] << std::endl;
+                log << "\tlen 6: " << frame->linesize[6] << std::endl;
+                log << "\tlen 7: " << frame->linesize[7] << std::endl;
+            }
+
+            pixel_primitives::bitmap btmp{new std::uint32_t[destinationWidth * destinationHeight],
+                                          static_cast<size_t>(destinationWidth),
+                                          static_cast<size_t>(destinationHeight)};
+
+            /* TODO: remove */ {
+                copyFrameToBuffer(reinterpret_cast<std::uint8_t *>(btmp.matrix),
+                                  frame,
+                                  codecContext,
+                                  imageConvertContext,
+                                  destinationWidth,
+                                  destinationHeight,
+                                  destinationFormat);
+            }
+
+            const auto image = graphicsProvider.createImage(
+                destinationWidth,
+                destinationHeight,
+                [&destinationFormat,
+                 &imageConvertContext,
+                 &frame,
+                 &codecContext](std::size_t w, std::size_t h, e172::Color *pixels) {
+                    copyFrameToBuffer(reinterpret_cast<std::uint8_t *>(pixels),
+                                      frame,
+                                      codecContext,
+                                      imageConvertContext,
+                                      w,
+                                      h,
+                                      destinationFormat);
+                });
+
+            dst_btmps.push_back({btmp, image});
+        }
+    }
+    return Right(Void{});
+}
+
+} // namespace
+
+MP4Decoder::MP4Decoder(const std::filesystem::path &path, std::ostream &log, double scale)
+    : m_path(path)
+    , m_log(log)
+    , m_scale(scale)
+{
+    if (path.empty()) {
         log << "You need to specify a media file." << std::endl;
         return;
     }
@@ -32,7 +183,7 @@ mp4_decoder::mp4_decoder(const char *path,
     // AVInputFormat (if you pass NULL it'll do the auto detect)
     // and AVDictionary (which are options to the demuxer)
     // http://ffmpeg.org/doxygen/trunk/group__lavf__decoding.html#ga31d601155e9035d5b0e7efedc894ee49
-    if (avformat_open_input(&m_formatContext, path, NULL, NULL) != 0) {
+    if (avformat_open_input(&m_formatContext, path.c_str(), NULL, NULL) != 0) {
         log << "ERROR could not open the file" << std::endl;
         return;
     }
@@ -143,25 +294,24 @@ mp4_decoder::mp4_decoder(const char *path,
         return;
     }
 
-
+    m_destinationFormat = AV_PIX_FMT_RGB32;
     m_destinationWidth = m_codecContext->width * scale;
     m_destinationHeight = m_codecContext->height * scale;
-    m_destinationFormat = AV_PIX_FMT_RGB32;
-    m_imageConvertContext = sws_getContext(
-                m_codecContext->width,
-                m_codecContext->height,
-                m_codecContext->pix_fmt,
-                m_destinationWidth,
-                m_destinationHeight,
-                m_destinationFormat,
-                SWS_BICUBIC,
-                nullptr,
-                nullptr,
-                nullptr
-                );
+    m_imageConvertContext = sws_getContext(m_codecContext->width,
+                                           m_codecContext->height,
+                                           m_codecContext->pix_fmt,
+                                           m_destinationWidth,
+                                           m_destinationHeight,
+                                           m_destinationFormat,
+                                           SWS_BICUBIC,
+                                           nullptr,
+                                           nullptr,
+                                           nullptr);
 }
 
-pixel_primitives::bitmap &mp4_decoder::frame(std::size_t index) const {
+MP4Decoder::Frame &MP4Decoder::frame(std::size_t index,
+                                     const e172::AbstractGraphicsProvider &graphicsProvider) const
+{
     if(index < m_cache.size()) {
         return m_cache[index];
     }
@@ -174,21 +324,20 @@ pixel_primitives::bitmap &mp4_decoder::frame(std::size_t index) const {
         // if it's the video stream
         if (m_packet->stream_index == m_video_stream_index) {
             m_log << "AVPacket->pts " << m_packet->pts << std::endl;
-            response = decode_packet(
-                        m_cache,
-                        m_packet,
-                        m_codecContext,
-                        m_imageConvertContext,
-                        m_frame,
-                        m_log,
-                        m_destinationWidth,
-                        m_destinationHeight,
-                        m_destinationFormat
-                        );
+            response = decodePacket(m_cache,
+                                    m_packet,
+                                    m_codecContext,
+                                    m_imageConvertContext,
+                                    m_frame,
+                                    m_log,
+                                    m_destinationWidth,
+                                    m_destinationHeight,
+                                    m_destinationFormat,
+                                    graphicsProvider);
             if (response < 0)
                 break;
-            // stop it, otherwise we'll be saving hundreds of frames
-            if(index < m_cache.size()) {
+
+            if (index < m_cache.size()) {
                 break;
             }
         }
@@ -199,119 +348,26 @@ pixel_primitives::bitmap &mp4_decoder::frame(std::size_t index) const {
     if(index < m_cache.size()) {
         return m_cache[index];
     } else {
-        m_log << "frame_count: " << frame_count() << std::endl;
+        m_log << "frame_count: " << frameCount() << std::endl;
         throw std::runtime_error("no frame for index: " + std::to_string(index));
     }
 }
 
-std::size_t mp4_decoder::frame_count() const {
+std::size_t MP4Decoder::frameCount() const
+{
     return m_formatContext ? m_formatContext->streams[m_video_stream_index]->nb_frames - 1 : 0;
 }
 
-std::uint8_t mp4_decoder::canal8(AVFrame *frame, std::size_t canal_no, std::size_t x, std::size_t y, std::size_t width) {
-    return frame->data[canal_no][y * frame->linesize[canal_no] * frame->linesize[canal_no] / width + x * frame->linesize[canal_no] / width];
+Rational<uint32_t> MP4Decoder::frameRate() const
+{
+    const auto rate = m_formatContext->streams[m_video_stream_index]->r_frame_rate;
+    assert(rate.num >= 0);
+    assert(rate.den >= 0);
+    return Rational<uint32_t>::make(rate.num, rate.den).value();
 }
 
-std::uint32_t mp4_decoder::canal32(AVFrame *frame, std::size_t canal_no, std::size_t x, std::size_t y, std::size_t width) {
-    return reinterpret_cast<std::uint32_t*>(frame->data[canal_no])[y * frame->linesize[canal_no] * frame->linesize[canal_no] / width + x * frame->linesize[canal_no] / width];
-}
-
-int mp4_decoder::decode_packet(std::vector<pixel_primitives::bitmap> &dst_btmps, AVPacket *pPacket, AVCodecContext *pCodecContext, SwsContext *imageConvertContext, AVFrame *pFrame, std::ostream &log, std::size_t destinationWidth, std::size_t destinationHeight, AVPixelFormat destinationFormat) {
-    // Supply raw packet data as input to a decoder
-    // https://ffmpeg.org/doxygen/trunk/group__lavc__decoding.html#ga58bc4bf1e0ac59e27362597e467efff3
-    int response = avcodec_send_packet(pCodecContext, pPacket);
-
-    if (response < 0) {
-        log << "Error while sending a packet to the decoder: " << av_err2str(response) << std::endl;
-        return response;
-    }
-
-    while (response >= 0)
-    {
-        // Return decoded output data (into a frame) from a decoder
-        // https://ffmpeg.org/doxygen/trunk/group__lavc__decoding.html#ga11e6542c4e66d3028668788a1a74217c
-        response = avcodec_receive_frame(pCodecContext, pFrame);
-        if (response == AVERROR(EAGAIN) || response == AVERROR_EOF) {
-            break;
-        } else if (response < 0) {
-            log << "Error while receiving a frame from the decoder: " << av_err2str(response) << std::endl;
-            return response;
-        }
-
-        if (response >= 0) {
-            bool log_frame = false;
-
-            if(log_frame) {
-                log
-                        << "Frame " << pCodecContext->frame_number
-                        << " (type=" << av_get_picture_type_char(pFrame->pict_type)
-                        << ", size=" << pFrame->pkt_size
-                        << " bytes, format=" << av_get_sample_fmt_name(AVSampleFormat(pFrame->format))
-                        << ") pts " << pFrame->pts
-                        << " key_frame " << pFrame->key_frame
-                        << " [DTS " << pFrame->coded_picture_number << "]" << std::endl;
-            }
-
-
-
-            char frame_filename[1024];
-            snprintf(frame_filename, sizeof(frame_filename), "%s-%d.pgm", "frame", pCodecContext->frame_number);
-            // Check if the frame is a planar YUV 4:2:0, 12bpp
-            // That is the format of the provided .mp4 file
-            // RGB formats will definitely not give a gray image
-            // Other YUV image may do so, but untested, so give a warning
-            if (pFrame->format != AV_PIX_FMT_YUV420P)
-            {
-                log << "Warning: the generated file may not be a grayscale image, but could e.g. be just the R component if the video format is RGB" << std::endl;
-            }
-            // save a grayscale frame into a .pgm file
-
-            if(log_frame) {
-                log << "\tw: " << pFrame->width << ", h: " << pFrame->height << std::endl;
-                log << "\tlen 0: " << pFrame->linesize[0] << std::endl;
-                log << "\tlen 1: " << pFrame->linesize[1] << std::endl;
-                log << "\tlen 2: " << pFrame->linesize[2] << std::endl;
-                log << "\tlen 3: " << pFrame->linesize[3] << std::endl;
-                log << "\tlen 4: " << pFrame->linesize[4] << std::endl;
-                log << "\tlen 5: " << pFrame->linesize[5] << std::endl;
-                log << "\tlen 6: " << pFrame->linesize[6] << std::endl;
-                log << "\tlen 7: " << pFrame->linesize[7] << std::endl;
-            }
-
-
-            pixel_primitives::bitmap btmp {
-                new std::uint32_t[destinationWidth * destinationHeight],
-                static_cast<size_t>(destinationWidth),
-                static_cast<size_t>(destinationHeight)
-            };
-
-            AVPicture picureRGB;
-            avpicture_fill(
-                        &picureRGB,
-                        reinterpret_cast<std::uint8_t*>(btmp.matrix),
-                        destinationFormat,
-                        destinationWidth,
-                        destinationHeight
-                        );
-
-            sws_scale(
-                        imageConvertContext,
-                        pFrame->data,
-                        pFrame->linesize,
-                        0,
-                        pCodecContext->height,
-                        picureRGB.data,
-                        picureRGB.linesize
-                        );
-
-            dst_btmps.push_back(btmp);
-        }
-    }
-    return 0;
-}
-
-
-mp4_decoder::~mp4_decoder() {
+MP4Decoder::~MP4Decoder()
+{
     m_log << "releasing all the resources" << std::endl;
     if(m_formatContext) { avformat_close_input(&m_formatContext); }
     if(m_packet) { av_packet_free(&m_packet); }
