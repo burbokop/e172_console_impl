@@ -1,6 +1,10 @@
+// Copyright 2023 Borys Boiko
+
 #include "colorizer.h"
 
 #include <e172/math/math.h>
+#include <limits>
+#include <string>
 
 namespace e172::impl::console {
 
@@ -9,24 +13,31 @@ std::string AnsiColorizer::beginSeq(uint32_t argb) const
     const auto& r = std::uint8_t(argb >> 16);
     const auto& g = std::uint8_t(argb >> 8);
     const auto& b = std::uint8_t(argb);
-    if(r == g && r == b) {
+
+    if (r == g && r == b) {
         return std::string();
     }
-    if(g == 0 && b == 0) {
+
+    if (g == 0 && b == 0) {
         return mapping[Red].code;
     }
-    if(r == 0 && b == 0) {
+
+    if (r == 0 && b == 0) {
         return mapping[Green].code;
     }
-    if(r == 0 && g == 0) {
+
+    if (r == 0 && g == 0) {
         return mapping[Blue].code;
     }
 
     std::int64_t minDelta = std::numeric_limits<std::int64_t>::max();
     std::string code;
-    for(std::size_t i = 0; i < mappingSize; ++i) {
-        const auto delta = std::abs(int64_t(mapping[i].rgb) - int64_t(argb & 0x00ffffff));
-        if(delta < minDelta) {
+
+    for (std::size_t i = 0; i < mappingSize; ++i) {
+        const auto delta = std::abs(
+            static_cast<std::int64_t>(mapping[i].rgb) - static_cast<std::int64_t>(argb & 0x00ffffff));
+
+        if (delta < minDelta) {
             minDelta = delta;
             code = mapping[i].code;
         }
@@ -34,14 +45,12 @@ std::string AnsiColorizer::beginSeq(uint32_t argb) const
     return code;
 }
 
-std::string AnsiColorizer::endSeq() const
-{
-    return AnsiColorizer::reset;
-}
+std::string AnsiColorizer::endSeq() const { return AnsiColorizer::reset; }
 
 AnsiTrueColorizer::AnsiTrueColorizer(uint8_t deterioration)
     : m_deterioration(deterioration)
-{}
+{
+}
 
 std::string AnsiTrueColorizer::beginSeq(uint32_t argb) const
 {
@@ -49,16 +58,13 @@ std::string AnsiTrueColorizer::beginSeq(uint32_t argb) const
     const auto& g = std::to_string((std::uint8_t(argb >> 8) / m_deterioration) * m_deterioration);
     const auto& b = std::to_string((std::uint8_t(argb >> 0) / m_deterioration) * m_deterioration);
 
-    //const auto& r = std::to_string(std::uint8_t(argb >> 16));
-    //const auto& g = std::to_string(std::uint8_t(argb >>  8));
-    //const auto& b = std::to_string(std::uint8_t(argb >>  0));
+    // const auto& r = std::to_string(std::uint8_t(argb >> 16));
+    // const auto& g = std::to_string(std::uint8_t(argb >>  8));
+    // const auto& b = std::to_string(std::uint8_t(argb >>  0));
 
     return "\033[38;2;" + r + ";" + g + ";" + b + "m";
 }
 
-std::string AnsiTrueColorizer::endSeq() const
-{
-    return AnsiTrueColorizer::reset;
-}
+std::string AnsiTrueColorizer::endSeq() const { return AnsiTrueColorizer::reset; }
 
 } // namespace e172::impl::console
