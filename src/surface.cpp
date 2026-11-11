@@ -1,37 +1,49 @@
+// Copyright 2023 Borys Boiko
+
 #include "surface.h"
 
 #include <cerrno>
 #include <cstdio>
 #include <e172/consolecolor.h>
-#include <ext/stdio_filebuf.h>
-#include <ext/stdio_sync_filebuf.h>
 #include <fstream>
 #include <iostream>
+#include <limits>
 #include <ostream>
+#include <string>
+
+#ifdef _WIN32
+#include <io.h>
+#include <windows.h>
+#else
+#include <ext/stdio_filebuf.h>
+#include <ext/stdio_sync_filebuf.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
+#endif
 
 namespace e172::impl::console {
 
 namespace {
 
-constexpr const char *ClearScreenSeq = "\x1B[2J\x1B[H";
+constexpr const char* ClearScreenSeq = "\x1B[2J\x1B[H";
 
 }
 
-std::ostream &Writer::output() const
-{
-    return m_output;
-}
+std::ostream& Writer::output() const { return m_output; }
 
-Writer::Writer(std::ostream &output, const Style &style)
+Writer::Writer(
+    std::ostream& output,
+    const Style& style)
     : m_output(output)
     , m_style(style)
-{}
+{
+}
 
 char Writer::charFromArgb(uint32_t argb) const
 {
-    return charFromBrightness((std::uint8_t(argb) + std::uint8_t(argb >> 8) + std::uint8_t(argb >> 16)) * std::uint8_t(argb >> 24) / 3 / 0xff);
+    return charFromBrightness(
+        (std::uint8_t(argb) + std::uint8_t(argb >> 8) + std::uint8_t(argb >> 16)) * std::uint8_t(argb >> 24) / 3
+        / 0xff);
 }
 
 char Writer::charFromBrightness(uint8_t brightness) const
@@ -42,15 +54,24 @@ char Writer::charFromBrightness(uint8_t brightness) const
     return m_style.gradient[brightness * (m_style.gradient.size() - 1) / 0xff];
 }
 
-e172::Vector<uint32_t> Writer::outputStreamSize(const std::ostream &stream, double whFraction)
+e172::Vector<uint32_t> Writer::outputStreamSize(
+    const std::ostream& stream,
+    double whFraction)
 {
-    if (const auto &fd = outputStreamDescriptor(stream)) {
+    if (const auto& fd = outputStreamDescriptor(stream)) {
         int cols = 80;
         int lines = 24;
 
-#ifdef TIOCGSIZE
+#ifdef _WIN32
+        HANDLE hConsole = reinterpret_cast<HANDLE>(_get_osfhandle(*fd));
+        CONSOLE_SCREEN_BUFFER_INFO csbi;
+        if (hConsole != INVALID_HANDLE_VALUE && GetConsoleScreenBufferInfo(hConsole, &csbi)) {
+            cols = csbi.srWindow.Right - csbi.srWindow.Left + 1;
+            lines = csbi.srWindow.Bottom - csbi.srWindow.Top + 1;
+        }
+#elif defined(TIOCGSIZE)
         struct ttysize ts;
-        ioctl(fd, TIOCGSIZE, &ts);
+        ioctl(*fd, TIOCGSIZE, &ts);
         cols = ts.ts_cols;
         lines = ts.ts_lines;
 #elif defined(TIOCGWINSZ)
@@ -58,44 +79,59 @@ e172::Vector<uint32_t> Writer::outputStreamSize(const std::ostream &stream, doub
         ioctl(*fd, TIOCGWINSZ, &ts);
         cols = ts.ws_col;
         lines = ts.ws_row;
-#endif /* TIOCGSIZE */
-
-        //std::cout << "fd: " << *fd << ", cols: " << cols << ", lines: " << lines << std::endl;
+#endif
 
         assert(cols >= 0);
         assert(lines >= 0);
 
-        return {static_cast<std::uint32_t>(cols * whFraction),
-                static_cast<std::uint32_t>(lines - 1) /* one line is input */};
+        return { static_cast<std::uint32_t>(cols * whFraction),
+                 static_cast<std::uint32_t>(lines - 1) /* one line is input */ };
     }
     return { 0, 0 };
 }
 
-std::optional<int> Writer::outputStreamDescriptor(const std::ostream &stream)
+std::optional<int> Writer::outputStreamDescriptor(const std::ostream& stream)
 {
+#ifdef _WIN32
+    if (&stream == &std::cout) {
+        return _fileno(stdout);
+    }
+
+    if (&stream == &std::cerr || &stream == &std::clog) {
+        return _fileno(stderr);
+    }
+
+    return std::nullopt;
+#else
     const auto& stdio_buf = dynamic_cast<__gnu_cxx::stdio_filebuf<char>*>(stream.rdbuf());
-    if(stdio_buf) {
+    if (stdio_buf) {
         return stdio_buf->fd();
     }
+
     const auto& stdiosync_buf = dynamic_cast<__gnu_cxx::stdio_sync_filebuf<char>*>(stream.rdbuf());
-    if(stdiosync_buf) {
+    if (stdiosync_buf) {
         return stdiosync_buf->file()->_fileno;
     }
+
     const auto& file_buf = dynamic_cast<std::filebuf*>(stream.rdbuf());
-    if(file_buf) {
+    if (file_buf) {
         struct tmp_filebuf : public std::filebuf {
             int fd() { return this->_M_file.fd(); }
         };
         return static_cast<tmp_filebuf*>(file_buf)->fd();
     }
+
     return std::nullopt;
+#endif
 }
 
-void Writer::setFrameSize(std::size_t w, std::size_t h)
+void Writer::setFrameSize(
+    std::size_t w,
+    std::size_t h)
 {
-    if(w != m_bitmap.width || h != m_bitmap.height) {
-        if(w != 0 && h != 0) {
-            if(m_bitmap) {
+    if (w != m_bitmap.width || h != m_bitmap.height) {
+        if (w != 0 && h != 0) {
+            if (m_bitmap) {
                 delete m_bitmap.matrix;
             }
             m_bitmap = pixel_primitives::bitmap { new uint32_t[w * h], w, h };
@@ -106,17 +142,15 @@ void Writer::setFrameSize(std::size_t w, std::size_t h)
 std::size_t Writer::writeFrame()
 {
     std::size_t result = 0;
-    if(m_bitmap && m_bitmap.width > 0 && m_bitmap.height > 0) {
+    if (m_bitmap && m_bitmap.width > 0 && m_bitmap.height > 0) {
         const auto w = m_bitmap.width / m_style.symbolWHFraction;
         const auto h = m_bitmap.height;
 
         std::string buffer; //{ buffer.reserve(); }
         std::string lastColorCode;
-        for(std::size_t y = 0; y < h; ++y) {
-            for(std::size_t x = 0; x < w; ++x) {
-                std::uint32_t argb = pixel_primitives::pixel(m_bitmap,
-                                                             x * m_style.symbolWHFraction,
-                                                             y);
+        for (std::size_t y = 0; y < h; ++y) {
+            for (std::size_t x = 0; x < w; ++x) {
+                std::uint32_t argb = pixel_primitives::pixel(m_bitmap, x * m_style.symbolWHFraction, y);
 
                 if (m_style.ignoreAlpha) {
                     argb |= 0xff000000;
@@ -125,8 +159,8 @@ std::size_t Writer::writeFrame()
 
                 if (m_style.colorizer) {
                     std::string cc = m_style.colorizer->beginSeq(argb);
-                    if(cc != lastColorCode) {
-                        if(cc.size() > 0) {
+                    if (cc != lastColorCode) {
+                        if (cc.size() > 0) {
                             buffer += cc;
                         } else {
                             buffer += m_style.colorizer->endSeq();
@@ -143,7 +177,7 @@ std::size_t Writer::writeFrame()
         result = buffer.size();
     }
     if (m_autoResize) {
-        const auto &size = outputStreamSize(m_output, m_style.symbolWHFraction);
+        const auto& size = outputStreamSize(m_output, m_style.symbolWHFraction);
         setFrameSize(size.x(), size.y());
     }
     return result;
@@ -151,7 +185,7 @@ std::size_t Writer::writeFrame()
 
 Writer::~Writer()
 {
-    if(m_bitmap) {
+    if (m_bitmap) {
         delete m_bitmap.matrix;
     }
     m_output << ClearScreenSeq;

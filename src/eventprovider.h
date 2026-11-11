@@ -1,15 +1,17 @@
+// Copyright 2023 Borys Boiko
+
 #pragma once
 
 #include <e172/abstracteventprovider.h>
+#include <e172/net/socket.h>
+#include <memory>
+#include <queue>
 
 namespace e172::impl::console {
 
-class StdinSocket;
-
-class EventProvider : public e172::AbstractEventProvider
-{
+class EventProvider : public e172::AbstractEventProvider {
 public:
-    EventProvider(std::ostream &log);
+    EventProvider(std::ostream& log);
     ~EventProvider();
 
     // AbstractEventHandler interface
@@ -20,9 +22,9 @@ private:
     void bufferize();
 
 private:
-    std::unique_ptr<StdinSocket> m_stdinSocket;
+    std::unique_ptr<Socket> m_stdinSocket;
     std::queue<Event> m_events;
-    std::ostream &m_log;
+    std::ostream& m_log;
 };
 
 } // namespace e172::impl::console

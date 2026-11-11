@@ -1,11 +1,11 @@
+// Copyright 2023 Borys Boiko
+
 #include "eventprovider.h"
 
+#include "socket.h"
 #include <cstring>
-#include <curses.h>
-#include <e172/net/linux/socket.h>
-#include <termios.h>
+#include <iostream>
 
-#include <fstream>
 namespace e172::impl::console {
 
 namespace {
@@ -15,9 +15,10 @@ namespace escapeseq {
 constexpr Byte BeginByte = 0x1B;
 constexpr Byte SecondByte = 0x5b;
 
-std::optional<std::size_t> findFirstTerminatingByte(Byte *arr,
-                                                    std::size_t len,
-                                                    std::size_t startIndex)
+std::optional<std::size_t> findFirstTerminatingByte(
+    Byte* arr,
+    std::size_t len,
+    std::size_t startIndex)
 {
     for (std::size_t i = startIndex; i < len; ++i) {
         /// final byte (F) from the range 0x30–0x7E.
@@ -30,73 +31,75 @@ std::optional<std::size_t> findFirstTerminatingByte(Byte *arr,
 
 } // namespace escapeseq
 
-e172::Scancode scancodeFromSym(std::uint8_t sym, bool esc)
+e172::Scancode scancodeFromSym(
+    std::uint8_t sym,
+    bool esc)
 {
     switch (sym) {
     case 0x00:
         return e172::ScancodeUnknown;
     case 0x01:
-        todo(); //SOH;
+        todo(); // SOH;
     case 0x02:
-        todo(); //STX;
+        todo(); // STX;
     case 0x03:
-        todo(); //ETX;
+        todo(); // ETX;
     case 0x04:
-        todo(); //EOT;
+        todo(); // EOT;
     case 0x05:
-        todo(); //ENQ;
+        todo(); // ENQ;
     case 0x06:
-        todo(); //ACK;
+        todo(); // ACK;
     case 0x07:
-        todo(); //BEL;
+        todo(); // BEL;
     case 0x08:
-        todo(); //BS;
+        todo(); // BS;
     case 0x09:
-        todo(); //HT;
+        todo(); // HT;
     case 0x0A:
-        return esc ? todo() : e172::ScancodeReturn; //LF;
+        return esc ? todo() : e172::ScancodeReturn; // LF;
     case 0x0B:
-        todo(); //VT;
+        todo(); // VT;
     case 0x0C:
-        todo(); //FF;
+        todo(); // FF;
     case 0x0D:
-        todo(); //CR;
+        todo(); // CR;
     case 0x0E:
-        todo(); //SO;
+        todo(); // SO;
     case 0x0F:
-        todo(); //SI;
+        todo(); // SI;
     case 0x10:
-        todo(); //DLE;
+        todo(); // DLE;
     case 0x11:
-        todo(); //DC1;
+        todo(); // DC1;
     case 0x12:
-        todo(); //DC2;
+        todo(); // DC2;
     case 0x13:
-        todo(); //DC3;
+        todo(); // DC3;
     case 0x14:
-        todo(); //DC4;
+        todo(); // DC4;
     case 0x15:
-        todo(); //NAK;
+        todo(); // NAK;
     case 0x16:
-        todo(); //SYN;
+        todo(); // SYN;
     case 0x17:
-        todo(); //ETB;
+        todo(); // ETB;
     case 0x18:
-        todo(); //CAN;
+        todo(); // CAN;
     case 0x19:
-        todo(); //EM;
+        todo(); // EM;
     case 0x1A:
-        todo(); //SUB;
+        todo(); // SUB;
     case escapeseq::BeginByte:
         return esc ? throw std::logic_error("already escaped") : e172::ScancodeEscape;
     case 0x1C:
-        todo(); //FS;
+        todo(); // FS;
     case 0x1D:
-        todo(); //GS;
+        todo(); // GS;
     case 0x1E:
-        todo(); //RS;
+        todo(); // RS;
     case 0x1F:
-        todo(); //US;
+        todo(); // US;
     case 0x20:
         return esc ? todo() : e172::ScancodeSpace;
     case 0x21:
@@ -288,61 +291,18 @@ e172::Scancode scancodeFromSym(std::uint8_t sym, bool esc)
     case 0x7E:
         todo(); //'~';
     case 0x7F:
-        todo(); //DEL;
+        todo(); // DEL;
     }
     return e172::ScancodeUnknown;
 }
 
 } // namespace
 
-class StdinSocket : e172::LinuxSocket
-{
-public:
-    StdinSocket()
-        : e172::LinuxSocket(STDIN_FILENO)
-    {
-        setFdNonBlockingFlag(fd(), false);
-    }
-
-    ~StdinSocket() {}
-
-    std::size_t bufferize() override
-    {
-        setFdNonBlockingFlag(fd(), true);
-
-        termios orgAttr, newAttr;
-
-        //-----  store old settings -----------
-        auto res = tcgetattr(fd(), &orgAttr);
-        assert(res == 0);
-        //---- set new terminal parms --------
-        memcpy(&newAttr, &orgAttr, sizeof(newAttr));
-        newAttr.c_lflag &= ~(ICANON | ECHO | ECHOE | ECHOK | ECHONL | ECHOPRT | ECHOKE | ICRNL);
-        newAttr.c_cc[VTIME] = 10;
-        newAttr.c_cc[VMIN] = 1;
-        tcsetattr(fd(), TCSANOW, &newAttr);
-
-        const auto size = e172::LinuxSocket::bufferize();
-
-        //------  restore old settings ---------
-        res = tcsetattr(fd(), TCSANOW, &orgAttr);
-        assert(res == 0);
-
-        setFdNonBlockingFlag(fd(), false);
-
-        return size;
-    }
-
-    using e172::LinuxSocket::bytesAvailable;
-    using e172::LinuxSocket::isConnected;
-    using e172::LinuxSocket::peek;
-    using e172::LinuxSocket::read;
-};
-
-EventProvider::EventProvider(std::ostream &log)
-    : m_stdinSocket(std::make_unique<StdinSocket>())
+EventProvider::EventProvider(std::ostream& log)
+    : m_stdinSocket(createStdinSocket())
     , m_log(log)
-{}
+{
+}
 
 EventProvider::~EventProvider() = default;
 
@@ -380,19 +340,17 @@ void EventProvider::bufferize()
                         m_log << "ecs -> " << e172::Bytes(seq, seq + bytesRead) << std::endl;
                     }
 
-                    if (const std::optional<std::size_t> terminatingByteIndex
-                        = escapeseq::findFirstTerminatingByte(seq, bytesRead, 2)) {
+                    if (const std::optional<std::size_t>
+                            terminatingByteIndex = escapeseq::findFirstTerminatingByte(seq, bytesRead, 2)) {
                         const auto seqlen = *terminatingByteIndex + 1;
                         bytesRead = m_stdinSocket->read(seq, seqlen);
                         assert(bytesRead == seqlen);
 
                         if (m_log.good()) {
                             m_log << "term: " << *terminatingByteIndex << " (" << std::hex
-                                  << static_cast<std::size_t>(seq[*terminatingByteIndex])
-                                  << std::dec << ")" << std::endl;
-                            m_log << "ecs: "
-                                  << e172::Bytes(seq + 1, seq + *terminatingByteIndex + 1)
+                                  << static_cast<std::size_t>(seq[*terminatingByteIndex]) << std::dec << ")"
                                   << std::endl;
+                            m_log << "ecs: " << e172::Bytes(seq + 1, seq + *terminatingByteIndex + 1) << std::endl;
                         }
 
                         if (seqlen == 3) {
@@ -409,8 +367,8 @@ void EventProvider::bufferize()
                 Byte sym;
                 m_stdinSocket->read(&sym, sizeof(sym));
                 if (m_log.good()) {
-                    m_log << "no ecs -> " << static_cast<std::size_t>(sym) << " ("
-                          << static_cast<char>(sym) << ")" << std::endl;
+                    m_log << "no ecs -> " << static_cast<std::size_t>(sym) << " (" << static_cast<char>(sym) << ")"
+                          << std::endl;
                 }
                 const auto scancode = scancodeFromSym(sym, false);
                 m_events.push(e172::Event::keyDown(scancode));

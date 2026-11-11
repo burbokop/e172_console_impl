@@ -1,3 +1,5 @@
+// Copyright 2023 Borys Boiko
+
 #pragma once
 
 #include <cstdint>
@@ -5,18 +7,15 @@
 
 namespace e172::impl::console {
 
-class Colorizer
-{
+class Colorizer {
 public:
     virtual std::string beginSeq(std::uint32_t argb) const = 0;
     virtual std::string endSeq() const = 0;
     virtual ~Colorizer() {}
 };
 
-class AnsiColorizer : public Colorizer
-{
+class AnsiColorizer : public Colorizer {
 public:
-
     struct color_mapping {
         const char* code;
         uint32_t rgb;
@@ -41,38 +40,29 @@ public:
         /* Bright White   */ { "\033[97m", 0xffffff },
     };
 
-
-    //static inline const color_mapping mapping[] = {
-    //    /* Blue	      */ { "\033[34m", 0x0000ff },
-    //    /* Green	  */ { "\033[32m", 0x00ff00 },
-    //    /* Cyan	      */ { "\033[36m", 0x00ffff },
-    //    /* Red	      */ { "\033[31m", 0xff0000 },
-    //    /* Magenta    */ { "\033[35m", 0xff00ff },
-    //    /* Orange	  */ { "\033[33m", 0xff8800 },
-    //};
-
-
-    enum Mapping {
-        Blue = 0,
-        Green,
-        Cyan,
-        Red,
-        Magenta,
-        Orange
+    static inline const color_mapping old_mapping[] = {
+        /* Blue           */ { "\033[34m", 0x0000ff },
+        /* Green          */ { "\033[32m", 0x00ff00 },
+        /* Cyan           */ { "\033[36m", 0x00ffff },
+        /* Red            */ { "\033[31m", 0xff0000 },
+        /* Magenta        */ { "\033[35m", 0xff00ff },
+        /* Orange         */ { "\033[33m", 0xff8800 },
     };
 
-    static constexpr std::size_t mappingSize = sizeof (mapping) / sizeof (mapping[0]);
+    enum Mapping { Blue = 0, Green, Cyan, Red, Magenta, Orange };
+
+    static constexpr std::size_t mappingSize = sizeof(mapping) / sizeof(mapping[0]);
     static inline const char* reset = "\033[0m";
 
     // colorizer interface
 public:
-    virtual std::string beginSeq(std::uint32_t argb) const override;
-    virtual std::string endSeq() const override;
+    std::string beginSeq(std::uint32_t argb) const override;
+    std::string endSeq() const override;
 };
 
-class AnsiTrueColorizer : public Colorizer
-{
+class AnsiTrueColorizer : public Colorizer {
     std::uint8_t m_deterioration;
+
 public:
     static inline const char* reset = "\033[0m";
 
@@ -80,8 +70,8 @@ public:
 
     // colorizer interface
 public:
-    virtual std::string beginSeq(std::uint32_t argb) const override;
-    virtual std::string endSeq() const override;
+    std::string beginSeq(std::uint32_t argb) const override;
+    std::string endSeq() const override;
 };
 
 } // namespace e172::impl::console
