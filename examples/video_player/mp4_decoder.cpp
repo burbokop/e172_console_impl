@@ -23,65 +23,56 @@ namespace e172::impl::console::video_player {
 
 namespace {
 
-void copyFrameToBuffer(Byte *dst,
-                       AVFrame *frame,
-                       AVCodecContext *codecContext,
-                       SwsContext *imageConvertContext,
-                       std::size_t destinationWidth,
-                       std::size_t destinationHeight,
-                       AVPixelFormat destinationFormat)
+void copyFrameToBuffer(
+    Byte* dst,
+    AVFrame* frame,
+    AVCodecContext* codecContext,
+    SwsContext* imageConvertContext,
+    std::size_t destinationWidth,
+    std::size_t destinationHeight,
+    AVPixelFormat destinationFormat)
 {
     constexpr std::size_t align = 1;
-    struct Picture
-    {
-        std::uint8_t *data[AV_NUM_DATA_POINTERS];
+    struct Picture {
+        std::uint8_t* data[AV_NUM_DATA_POINTERS];
         int linesize[AV_NUM_DATA_POINTERS];
     };
 
     Picture picture;
-    av_image_fill_arrays(picture.data,
-                         picture.linesize,
-                         dst,
-                         destinationFormat,
-                         destinationWidth,
-                         destinationHeight,
-                         align);
+    av_image_fill_arrays(
+        picture.data, picture.linesize, dst, destinationFormat, destinationWidth, destinationHeight, align);
 
-    sws_scale(imageConvertContext,
-              frame->data,
-              frame->linesize,
-              0,
-              codecContext->height,
-              picture.data,
-              picture.linesize);
+    sws_scale(
+        imageConvertContext, frame->data, frame->linesize, 0, codecContext->height, picture.data, picture.linesize);
 }
 
-struct DecodeError
-{
+struct DecodeError {
     std::string during;
     int averrcode;
 };
 
-std::ostream &operator<<(std::ostream &stream, DecodeError err)
+std::ostream& operator<<(std::ostream& stream, DecodeError err)
 {
-    return stream << "Decode error " << err.during << ": " << av_err2str(err.averrcode);
+    std::array<char, AV_ERROR_MAX_STRING_SIZE> buf {};
+    return stream << "Decode error " << err.during << ": "
+                  << av_make_error_string(buf.data(), AV_ERROR_MAX_STRING_SIZE, err.averrcode);
 }
 
-Either<DecodeError, Void> decodePacket(std::vector<MP4Decoder::Frame> &dst_btmps,
-                                       AVPacket *packet,
-                                       AVCodecContext *codecContext,
-                                       SwsContext *imageConvertContext,
-                                       AVFrame *frame,
-                                       std::ostream &log,
-                                       std::size_t destinationWidth,
-                                       std::size_t destinationHeight,
-                                       AVPixelFormat destinationFormat,
-                                       const e172::AbstractGraphicsProvider &graphicsProvider)
+Either<DecodeError, Void> decodePacket(
+    std::vector<MP4Decoder::Frame>& dst_btmps,
+    AVPacket* packet,
+    AVCodecContext* codecContext,
+    SwsContext* imageConvertContext,
+    AVFrame* frame,
+    std::ostream& log,
+    std::size_t destinationWidth,
+    std::size_t destinationHeight,
+    AVPixelFormat destinationFormat,
+    const e172::AbstractGraphicsProvider& graphicsProvider)
 {
     auto response = avcodec_send_packet(codecContext, packet);
     if (response < 0) {
-        return Left(
-            DecodeError{.during = "during sending a packet to the decoder", .averrcode = response});
+        return Left(DecodeError { .during = "during sending a packet to the decoder", .averrcode = response });
     }
 
     while (response >= 0) {
@@ -89,20 +80,18 @@ Either<DecodeError, Void> decodePacket(std::vector<MP4Decoder::Frame> &dst_btmps
         if (response == AVERROR(EAGAIN) || response == AVERROR_EOF) {
             break;
         } else if (response < 0) {
-            return Left(DecodeError{.during = "during receiving a frame from the decoder",
-                                    .averrcode = response});
+            return Left(DecodeError { .during = "during receiving a frame from the decoder", .averrcode = response });
         }
 
         if (response >= 0) {
             bool log_frame = false;
 
             if (log_frame) {
-                log << "Frame " << codecContext->frame_number
-                    << " (type=" << av_get_picture_type_char(frame->pict_type)
+                log << "Frame " << codecContext->frame_number << " (type=" << av_get_picture_type_char(frame->pict_type)
                     << ", size=" << frame->pkt_size
-                    << " bytes, format=" << av_get_sample_fmt_name(AVSampleFormat(frame->format))
-                    << ") pts " << frame->pts << " key_frame " << frame->key_frame << " [DTS "
-                    << frame->coded_picture_number << "]" << std::endl;
+                    << " bytes, format=" << av_get_sample_fmt_name(AVSampleFormat(frame->format)) << ") pts "
+                    << frame->pts << " key_frame " << frame->key_frame << " [DTS " << frame->coded_picture_number << "]"
+                    << std::endl;
             }
 
             if (log_frame) {
@@ -117,45 +106,45 @@ Either<DecodeError, Void> decodePacket(std::vector<MP4Decoder::Frame> &dst_btmps
                 log << "\tlen 7: " << frame->linesize[7] << std::endl;
             }
 
-            pixel_primitives::bitmap btmp{new std::uint32_t[destinationWidth * destinationHeight],
-                                          static_cast<size_t>(destinationWidth),
-                                          static_cast<size_t>(destinationHeight)};
+            pixel_primitives::bitmap btmp { new std::uint32_t[destinationWidth * destinationHeight],
+                                            static_cast<size_t>(destinationWidth),
+                                            static_cast<size_t>(destinationHeight) };
 
             /* TODO: remove */ {
-                copyFrameToBuffer(reinterpret_cast<std::uint8_t *>(btmp.matrix),
-                                  frame,
-                                  codecContext,
-                                  imageConvertContext,
-                                  destinationWidth,
-                                  destinationHeight,
-                                  destinationFormat);
+                copyFrameToBuffer(
+                    reinterpret_cast<std::uint8_t*>(btmp.matrix),
+                    frame,
+                    codecContext,
+                    imageConvertContext,
+                    destinationWidth,
+                    destinationHeight,
+                    destinationFormat);
             }
 
             const auto image = graphicsProvider.createImage(
                 destinationWidth,
                 destinationHeight,
-                [&destinationFormat,
-                 &imageConvertContext,
-                 &frame,
-                 &codecContext](std::size_t w, std::size_t h, e172::Color *pixels) {
-                    copyFrameToBuffer(reinterpret_cast<std::uint8_t *>(pixels),
-                                      frame,
-                                      codecContext,
-                                      imageConvertContext,
-                                      w,
-                                      h,
-                                      destinationFormat);
+                [&destinationFormat, &imageConvertContext, &frame, &codecContext](
+                    std::size_t w, std::size_t h, e172::Color* pixels) {
+                    copyFrameToBuffer(
+                        reinterpret_cast<std::uint8_t*>(pixels),
+                        frame,
+                        codecContext,
+                        imageConvertContext,
+                        w,
+                        h,
+                        destinationFormat);
                 });
 
-            dst_btmps.push_back({btmp, image});
+            dst_btmps.push_back({ btmp, image });
         }
     }
-    return Right(Void{});
+    return Right(Void {});
 }
 
 } // namespace
 
-MP4Decoder::MP4Decoder(const std::filesystem::path &path, std::ostream &log, double scale)
+MP4Decoder::MP4Decoder(const std::filesystem::path& path, std::ostream& log, double scale)
     : m_path(path)
     , m_log(log)
     , m_scale(scale)
@@ -191,7 +180,8 @@ MP4Decoder::MP4Decoder(const std::filesystem::path &path, std::ostream &log, dou
     // now we have access to some information about our file
     // since we read its header we can say what format (container) it's
     // and some other information related to the format itself.
-    log << "format " << m_formatContext->iformat->name << ", duration " << m_formatContext->duration << " us, bit_rate " << m_formatContext->bit_rate << std::endl;
+    log << "format " << m_formatContext->iformat->name << ", duration " << m_formatContext->duration << " us, bit_rate "
+        << m_formatContext->bit_rate << std::endl;
 
     log << "finding stream info from format" << std::endl;
     // read Packets from the Format to get stream information
@@ -202,7 +192,7 @@ MP4Decoder::MP4Decoder(const std::filesystem::path &path, std::ostream &log, dou
     // and options contains options for codec corresponding to i-th stream.
     // On return each dictionary will be filled with options that were not found.
     // https://ffmpeg.org/doxygen/trunk/group__lavf__decoding.html#gad42172e27cddafb81096939783b157bb
-    if (avformat_find_stream_info(m_formatContext,  NULL) < 0) {
+    if (avformat_find_stream_info(m_formatContext, NULL) < 0) {
         log << "ERROR could not get the stream info" << std::endl;
         return;
     }
@@ -210,30 +200,32 @@ MP4Decoder::MP4Decoder(const std::filesystem::path &path, std::ostream &log, dou
     // the component that knows how to enCOde and DECode the stream
     // it's the codec (audio or video)
     // http://ffmpeg.org/doxygen/trunk/structAVCodec.html
-    const AVCodec *pCodec = NULL;
+    const AVCodec* pCodec = NULL;
     // this component describes the properties of a codec used by the stream i
     // https://ffmpeg.org/doxygen/trunk/structAVCodecParameters.html
-    AVCodecParameters *pCodecParameters =  NULL;
+    AVCodecParameters* pCodecParameters = NULL;
     m_video_stream_index = -1;
 
     // loop though all the streams and print its main information
     for (int i = 0; i < m_formatContext->nb_streams; i++) {
-        AVCodecParameters *pLocalCodecParameters =  NULL;
+        AVCodecParameters* pLocalCodecParameters = NULL;
         pLocalCodecParameters = m_formatContext->streams[i]->codecpar;
-        log << "AVStream->time_base before open coded " << m_formatContext->streams[i]->time_base.num << "/" << m_formatContext->streams[i]->time_base.den << std::endl;
-        log << "AVStream->r_frame_rate before open coded " << m_formatContext->streams[i]->r_frame_rate.num << "/" << m_formatContext->streams[i]->r_frame_rate.den << std::endl;
+        log << "AVStream->time_base before open coded " << m_formatContext->streams[i]->time_base.num << "/"
+            << m_formatContext->streams[i]->time_base.den << std::endl;
+        log << "AVStream->r_frame_rate before open coded " << m_formatContext->streams[i]->r_frame_rate.num << "/"
+            << m_formatContext->streams[i]->r_frame_rate.den << std::endl;
         log << "AVStream->start_time " << m_formatContext->streams[i]->start_time << std::endl;
         log << "AVStream->duration " << m_formatContext->streams[i]->duration << std::endl;
 
         log << "finding the proper decoder (CODEC)" << std::endl;
 
-        const AVCodec *pLocalCodec = NULL;
+        const AVCodec* pLocalCodec = NULL;
 
         // finds the registered decoder for a codec ID
         // https://ffmpeg.org/doxygen/trunk/group__lavc__decoding.html#ga19a0ca553277f019dd5b0fec6e1f9dca
         pLocalCodec = ::avcodec_find_decoder(pLocalCodecParameters->codec_id);
 
-        if (pLocalCodec==NULL) {
+        if (pLocalCodec == NULL) {
             log << "ERROR unsupported codec!" << std::endl;
             // In this example if the codec is not found we just skip it
             continue;
@@ -247,13 +239,16 @@ MP4Decoder::MP4Decoder(const std::filesystem::path &path, std::ostream &log, dou
                 pCodecParameters = pLocalCodecParameters;
             }
 
-            log << "Video Codec: resolution " << pLocalCodecParameters->width << " x " << pLocalCodecParameters->height << std::endl;
+            log << "Video Codec: resolution " << pLocalCodecParameters->width << " x " << pLocalCodecParameters->height
+                << std::endl;
         } else if (pLocalCodecParameters->codec_type == AVMEDIA_TYPE_AUDIO) {
-            log << "Audio Codec: " << pLocalCodecParameters->channels << " channels, sample rate " << pLocalCodecParameters->sample_rate << std::endl;
+            log << "Audio Codec: " << pLocalCodecParameters->channels << " channels, sample rate "
+                << pLocalCodecParameters->sample_rate << std::endl;
         }
 
         // print its name, id and bitrate
-        log << "\tCodec " << pLocalCodec->name << " ID " << pLocalCodec->id << " bit_rate " << pLocalCodecParameters->bit_rate << std::endl;
+        log << "\tCodec " << pLocalCodec->name << " ID " << pLocalCodec->id << " bit_rate "
+            << pLocalCodecParameters->bit_rate << std::endl;
     }
 
     if (m_video_stream_index == -1) {
@@ -269,16 +264,14 @@ MP4Decoder::MP4Decoder(const std::filesystem::path &path, std::ostream &log, dou
 
     // Fill the codec context based on the values from the supplied codec parameters
     // https://ffmpeg.org/doxygen/trunk/group__lavc__core.html#gac7b282f51540ca7a99416a3ba6ee0d16
-    if (avcodec_parameters_to_context(m_codecContext, pCodecParameters) < 0)
-    {
+    if (avcodec_parameters_to_context(m_codecContext, pCodecParameters) < 0) {
         log << "failed to copy codec params to codec context" << std::endl;
         return;
     }
 
     // Initialize the AVCodecContext to use the given AVCodec.
     // https://ffmpeg.org/doxygen/trunk/group__lavc__core.html#ga11f785a188d7d9df71621001465b0f1d
-    if (avcodec_open2(m_codecContext, pCodec, NULL) < 0)
-    {
+    if (avcodec_open2(m_codecContext, pCodec, NULL) < 0) {
         log << "failed to open codec through avcodec_open2" << std::endl;
         return;
     }
@@ -297,22 +290,22 @@ MP4Decoder::MP4Decoder(const std::filesystem::path &path, std::ostream &log, dou
     m_destinationFormat = AV_PIX_FMT_RGB32;
     m_destinationWidth = m_codecContext->width * scale;
     m_destinationHeight = m_codecContext->height * scale;
-    m_imageConvertContext = sws_getContext(m_codecContext->width,
-                                           m_codecContext->height,
-                                           m_codecContext->pix_fmt,
-                                           m_destinationWidth,
-                                           m_destinationHeight,
-                                           m_destinationFormat,
-                                           SWS_BICUBIC,
-                                           nullptr,
-                                           nullptr,
-                                           nullptr);
+    m_imageConvertContext = sws_getContext(
+        m_codecContext->width,
+        m_codecContext->height,
+        m_codecContext->pix_fmt,
+        m_destinationWidth,
+        m_destinationHeight,
+        m_destinationFormat,
+        SWS_BICUBIC,
+        nullptr,
+        nullptr,
+        nullptr);
 }
 
-MP4Decoder::Frame &MP4Decoder::frame(std::size_t index,
-                                     const e172::AbstractGraphicsProvider &graphicsProvider) const
+MP4Decoder::Frame& MP4Decoder::frame(std::size_t index, const e172::AbstractGraphicsProvider& graphicsProvider) const
 {
-    if(index < m_cache.size()) {
+    if (index < m_cache.size()) {
         return m_cache[index];
     }
 
@@ -324,16 +317,17 @@ MP4Decoder::Frame &MP4Decoder::frame(std::size_t index,
         // if it's the video stream
         if (m_packet->stream_index == m_video_stream_index) {
             m_log << "AVPacket->pts " << m_packet->pts << std::endl;
-            response = decodePacket(m_cache,
-                                    m_packet,
-                                    m_codecContext,
-                                    m_imageConvertContext,
-                                    m_frame,
-                                    m_log,
-                                    m_destinationWidth,
-                                    m_destinationHeight,
-                                    m_destinationFormat,
-                                    graphicsProvider);
+            response = decodePacket(
+                m_cache,
+                m_packet,
+                m_codecContext,
+                m_imageConvertContext,
+                m_frame,
+                m_log,
+                m_destinationWidth,
+                m_destinationHeight,
+                m_destinationFormat,
+                graphicsProvider);
             if (response < 0)
                 break;
 
@@ -345,7 +339,7 @@ MP4Decoder::Frame &MP4Decoder::frame(std::size_t index,
         av_packet_unref(m_packet);
     }
 
-    if(index < m_cache.size()) {
+    if (index < m_cache.size()) {
         return m_cache[index];
     } else {
         m_log << "frame_count: " << frameCount() << std::endl;
@@ -369,11 +363,21 @@ Rational<uint32_t> MP4Decoder::frameRate() const
 MP4Decoder::~MP4Decoder()
 {
     m_log << "releasing all the resources" << std::endl;
-    if(m_formatContext) { avformat_close_input(&m_formatContext); }
-    if(m_packet) { av_packet_free(&m_packet); }
-    if(m_frame) { av_frame_free(&m_frame); }
-    if(m_codecContext) { avcodec_free_context(&m_codecContext); }
-    if(m_imageConvertContext) { sws_freeContext(m_imageConvertContext); }
+    if (m_formatContext) {
+        avformat_close_input(&m_formatContext);
+    }
+    if (m_packet) {
+        av_packet_free(&m_packet);
+    }
+    if (m_frame) {
+        av_frame_free(&m_frame);
+    }
+    if (m_codecContext) {
+        avcodec_free_context(&m_codecContext);
+    }
+    if (m_imageConvertContext) {
+        sws_freeContext(m_imageConvertContext);
+    }
 }
 
 } // namespace e172::impl::console::video_player
